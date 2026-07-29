@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fitting-cad"
+version = "0.0.1"
+description = "Open-core CAD layer automating transtibial prosthetic socket trim-line generation"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Arthur Gouaze", email = "122196040+arthurgouaze@users.noreply.github.com" }]
+keywords = ["prosthetics", "cad", "mesh", "trim-line", "fitting"]
+dependencies = [
+    "numpy>=1.26",
+    "trimesh>=4.0",
+    "scipy>=1.11",
+    # rtree provides the spatial index trimesh uses for ray-mesh intersection,
+    # which the trim-line rule engine relies on to project the curve onto the
+    # surface. Pure-Python wheel bundling libspatialindex; headless, no GL.
+    "rtree>=1.0",
+]
+
+[project.optional-dependencies]
+# Interactive viewer + point-picking landmark UI. Kept optional: it pulls in the
+# heavy GL/VTK stack (pyvista) and open3d, which lack wheels on some interpreters
+# (e.g. open3d has no cp313 wheel as of 2026-06). The core trim-line pipeline
+# (io / landmarks math / trimline / cli) runs without these.
+viz = ["pyvista>=0.43", "open3d>=0.18"]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[project.scripts]
+fitting-cad = "fitting_cad.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/arthurgouaze/fitting-cad-plugin"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fitting_cad"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

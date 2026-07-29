@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # On ubuntu the manylinux wheels (numpy, trimesh, rtree, ...) and ruff run
+      # directly -- no NixOS LD_LIBRARY_PATH / loader shims. We install the dev
+      # extra only (pytest + ruff); the viz extra (pyvista/open3d, heavy GL/VTK,
+      # no cp31x wheel on some interpreters) is deliberately skipped to keep CI
+      # light and headless.
+      - name: Install package (dev extra)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Test (pytest)
+        run: pytest

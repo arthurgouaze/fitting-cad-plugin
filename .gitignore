@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local mesh data (keep committed examples tracked but ignore large scans)
+*.ply
+*.stl
+*.step
+*.stp
+!examples/.gitkeep
+!examples/synthetic_limb.stl
+
+# Editor / OS
+.DS_Store
+*.swp
