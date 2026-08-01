@@ -1,20 +1,20 @@
 """Reproducible generator for the synthetic transtibial limb mesh.
 
-Produces ``examples/synthetic_limb.stl``: a closed, tapered, slightly elliptical
+Produces examples/synthetic_limb.stl: a closed, tapered, slightly elliptical
 tube standing in for a transtibial residual limb. It is deliberately simple --
 no patient data is involved -- but has the properties the pipeline needs:
 
-* a clear long axis (so PCA orientation has something to lock onto),
-* a wide **proximal** end and a narrower, rounded **distal** end (so the
-  proximal/distal sign convention in :func:`fitting_cad.io.normalize_orientation`
+- a clear long axis (so PCA orientation has something to lock onto),
+- a wide proximal end and a narrower, rounded distal end (so the
+  proximal/distal sign convention in fitting_cad.io.normalize_orientation
   can be exercised),
-* a slight elliptical cross-section (anterior-posterior vs medial-lateral),
-* a watertight surface (closed rim cap + rounded distal pole).
+- a slight elliptical cross-section (anterior-posterior vs medial-lateral),
+- a watertight surface (closed rim cap + rounded distal pole).
 
-The mesh is generated in an intentionally *off-canonical* pose (long axis along
+The mesh is generated in an intentionally off-canonical pose (long axis along
 a tilted direction, away from the origin) so normalization has real work to do.
 
-Run ``python examples/make_synthetic_limb.py`` to regenerate the committed STL.
+Run python examples/make_synthetic_limb.py to regenerate the committed STL.
 """
 
 from __future__ import annotations
@@ -38,13 +38,13 @@ def build_synthetic_limb() -> trimesh.Trimesh:
 
     Topology (kept watertight after an STL round-trip):
 
-    * ``N_RINGS`` rings of ``N_THETA`` vertices form the side wall. Every ring,
-      including the last, keeps a **non-zero** radius -- earlier versions tapered
+    - N_RINGS rings of N_THETA vertices form the side wall. Every ring,
+      including the last, keeps a non-zero radius -- earlier versions tapered
       the final rings to radius 0, collapsing them into degenerate zero-area
-      triangles that ``trimesh`` (and the STL round-trip) split off, breaking
+      triangles that trimesh (and the STL round-trip) split off, breaking
       watertightness. The distal end is closed by a single pole vertex instead.
-    * A proximal rim cap fans the open socket end (ring 0) to a centre vertex.
-    * A distal pole cap fans the last ring to one tip vertex below it, giving a
+    - A proximal rim cap fans the open socket end (ring 0) to a centre vertex.
+    - A distal pole cap fans the last ring to one tip vertex below it, giving a
       rounded, closed distal pole with no degenerate faces.
     """
     theta = np.linspace(0.0, 2.0 * np.pi, N_THETA, endpoint=False)

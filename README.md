@@ -19,18 +19,38 @@ revenue is planned later from a proprietary managed tier.
 
 ## Status
 
-Early build. The **I/O layer is implemented and tested**: `io.load_mesh`
-(STL/PLY import with point-cloud/scene rejection), `io.normalize_orientation`
-(PCA long-axis → +Z, proximal rim at origin), and `io.export_mesh` (STL/PLY).
+Early build, but the pipeline runs end to end:
+
+- **I/O** — `io.load_mesh` (STL/PLY import with point-cloud/scene rejection),
+  `io.normalize_orientation` (PCA long-axis → +Z, proximal rim at origin),
+  `io.export_mesh` (STL/PLY).
+- **Trim-line rule engine** — `trimline.generate_trimline` projects a
+  clinician-tunable `TrimRules` height profile onto the limb surface and returns
+  a closed, on-surface loop; `trimline.validate_trimline` reports closure gap,
+  distance to surface, and self-intersections.
+- **STEP export** — `io.export_curve` writes the trim loop as a CAD/CAM-ready
+  AP214 polyline (no CAD kernel required).
+- **Viewer** — `viewer.show` renders the limb, labelled landmark glyphs, and the
+  trim curve; supports off-screen PNG capture.
+- **Interactive landmark picker** — `landmarks.place_landmarks` walks the
+  clinician through the landmark sequence with click-to-place, undo, and skip,
+  snapping each pick to the nearest mesh vertex and persisting a canonical-frame
+  JSON sidecar.
+- **CLI** — `fitting-cad fit` (headless with `--landmarks`, or interactive) and
+  `fitting-cad view`.
+
 A committed synthetic limb mesh (`examples/synthetic_limb.stl`) backs the tests.
-Landmarks, the trim-line rule engine, the viewer, and STEP export are next.
+The viewer and picker need the optional `viz` extra
+(`pip install -e '.[dev,viz]'`); everything else runs headless. Next up:
+calibrating the `TrimRules` defaults against clinician-reviewed examples.
 
 ## Stack
 
 Python mesh stack (no full CAD kernel):
 
-- **geometry:** [`trimesh`](https://trimesh.org), [`Open3D`](https://www.open3d.org)
-- **viewer:** [`pyvista`](https://pyvista.org)
+- **geometry:** [`trimesh`](https://trimesh.org) + `numpy` / `scipy`, with
+  `rtree` for the ray-mesh queries the rule engine uses
+- **viewer / picking:** [`pyvista`](https://pyvista.org) (optional `viz` extra)
 - **export:** STL / PLY / STEP
 
 Develop on **synthetic or open limb-scan meshes** so nothing waits on IRB.
@@ -40,12 +60,13 @@ Develop on **synthetic or open limb-scan meshes** so nothing waits on IRB.
 ```
 src/fitting_cad/
   io.py         mesh import/export, orientation normalization
-  landmarks.py  interactive anatomical landmark placement
+  landmarks.py  landmark set, surface snapping, sidecar I/O, interactive picker
   trimline.py   rule-based trim-curve engine
-  viewer.py     pyvista viewer
-  cli.py        command-line entry point
-tests/          pytest stubs
-examples/       synthetic / open limb-scan meshes (placeholder)
+  viewer.py     pyvista viewer + overlay primitives
+  step_writer.py  dependency-free AP214 STEP writer
+  cli.py        command-line entry point (fit / view)
+tests/          pytest suite (headless; GL tests skip without the viz extra)
+examples/       synthetic / open limb-scan meshes
 docs/           design notes
 ```
 
@@ -72,9 +93,24 @@ scripts/ruff.sh check .
 On a normal FHS distro you can skip the helpers and run `.venv/bin/pytest` /
 `.venv/bin/ruff` directly.
 
-The interactive viewer + landmark UI need extra GL/VTK deps; install them with
-the optional `viz` extra (`pip install -e '.[dev,viz]'`). `open3d` currently has
-no wheel for Python 3.13, so use a 3.11/3.12 venv if you need it.
+The interactive viewer and the landmark picker need extra GL/VTK deps; install
+them with the optional `viz` extra:
+
+```sh
+.venv/bin/pip install -e '.[dev,viz]'
+
+# generate a trim line, picking landmarks interactively (saves a sidecar)
+fitting-cad fit examples/synthetic_limb.stl -o trimline.step
+
+# inspect a scan, its landmarks, and the generated curve
+fitting-cad view examples/synthetic_limb.stl \
+  --landmarks synthetic_limb.landmarks.json --trimline
+```
+
+On NixOS the VTK wheel also dlopens GL/X11 at render time; `scripts/devenv.sh`
+puts those on the loader path too, so run the viewer through it. Add
+`--screenshot out.png` to `view` to render off-screen instead of opening a
+window (useful on headless hosts and in CI).
 
 ## Project notes
 

@@ -1,8 +1,8 @@
 """I/O-layer tests against the synthetic limb mesh.
 
-These exercise load -> normalize -> export round-trip on ``examples/
-synthetic_limb.stl`` (no patient data). Full-pipeline tests (load -> landmarks
--> trimline -> export) arrive once landmark/trimline land.
+These exercise load -> normalize -> export round-trip on
+examples/synthetic_limb.stl (no patient data). Full-pipeline tests (load ->
+landmarks -> trimline -> export) arrive once landmark/trimline land.
 """
 
 from __future__ import annotations
@@ -124,7 +124,7 @@ def test_export_unsupported_suffix(tmp_path):
 
 
 def _make_circle(n: int = 24, radius: float = 40.0, z: float = 12.5) -> np.ndarray:
-    """An ordered, unclosed (N, 3) loop: a horizontal circle at height ``z``."""
+    """An ordered, unclosed (N, 3) loop: a horizontal circle at height z."""
     theta = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
     return np.column_stack([radius * np.cos(theta), radius * np.sin(theta), np.full(n, z)])
 

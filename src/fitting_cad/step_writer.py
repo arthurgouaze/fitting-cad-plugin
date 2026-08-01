@@ -6,29 +6,29 @@ reference wire for socket construction.
 
 Why hand-rolled instead of an OCCT bridge:
 
-* ``cascadio`` (trimesh's OCCT bridge) only reads STEP -> GLB; it cannot *write*
+- cascadio (trimesh's OCCT bridge) only reads STEP -> GLB; it cannot write
   STEP, and a wireframe curve would not survive a mesh conversion anyway.
-* ``build123d`` / ``OCP`` pull in the multi-hundred-megabyte ``cadquery-ocp``
+- build123d / OCP pull in the multi-hundred-megabyte cadquery-ocp
   OCCT bindings whose wheels are fragile on Python 3.13 / NixOS -- far too heavy
   just to serialize a polyline.
 
 STEP is a plain-text format, so a small, well-formed AP214 writer is the lightest
 thing that produces a valid curve entity, with no dependency and no native code.
 
-Entity schema (AP214 ``AUTOMOTIVE_DESIGN``, a widely-imported STEP flavor):
+Entity schema (AP214 AUTOMOTIVE_DESIGN, a widely-imported STEP flavor):
 
-* A minimal product structure (``APPLICATION_CONTEXT`` -> ``PRODUCT`` ->
-  ``PRODUCT_DEFINITION`` -> ``PRODUCT_DEFINITION_SHAPE``) so the curve opens as a
+- A minimal product structure (APPLICATION_CONTEXT -> PRODUCT ->
+  PRODUCT_DEFINITION -> PRODUCT_DEFINITION_SHAPE) so the curve opens as a
   named part rather than orphan geometry.
-* A units context in **millimetres** (``SI_UNIT(.MILLI.,.METRE.)``) -- the limb
+- A units context in millimetres (SI_UNIT(.MILLI.,.METRE.)) -- the limb
   frame is metric mm, and CAM tools need explicit units.
-* One ``CARTESIAN_POINT`` per loop vertex.
-* A single ``POLYLINE`` through those points. A polyline preserves the exact
+- One CARTESIAN_POINT per loop vertex.
+- A single POLYLINE through those points. A polyline preserves the exact
   generated vertices (no spline re-approximation); the trim loop is already
   densely sampled, so a polyline is the faithful representation.
-* The polyline is carried by a ``GEOMETRIC_CURVE_SET`` inside a
-  ``GEOMETRICALLY_BOUNDED_WIREFRAME_SHAPE_REPRESENTATION``, linked to the product
-  via ``SHAPE_DEFINITION_REPRESENTATION``.
+- The polyline is carried by a GEOMETRIC_CURVE_SET inside a
+  GEOMETRICALLY_BOUNDED_WIREFRAME_SHAPE_REPRESENTATION, linked to the product
+  via SHAPE_DEFINITION_REPRESENTATION.
 
 The loop is closed explicitly: the first vertex is repeated as the last polyline
 point so the wire forms a closed rim.
@@ -58,16 +58,16 @@ def write_step_polyline(
     """Write an ordered closed 3D loop to a STEP file as a single polyline.
 
     Args:
-        curve: An ``(N, 3)`` array of ordered loop vertices, in millimetres, in
-            the canonical limb frame. ``N`` must be at least 3.
-        path: Destination ``.step`` / ``.stp`` path. Parent dirs are created.
+        curve: An (N, 3) array of ordered loop vertices, in millimetres, in
+            the canonical limb frame. N must be at least 3.
+        path: Destination .step / .stp path. Parent dirs are created.
         name: Product / curve label embedded in the file.
 
     Returns:
-        The :class:`~pathlib.Path` written.
+        The pathlib.Path written.
 
     Raises:
-        ValueError: ``curve`` is not an ``(N, 3)`` array with ``N >= 3``, or
+        ValueError: curve is not an (N, 3) array with N >= 3, or
             contains non-finite coordinates.
     """
     pts = np.asarray(curve, dtype=np.float64)
@@ -96,7 +96,7 @@ def write_step_polyline(
 
 
 def _build_step_text(pts: np.ndarray, *, name: str) -> str:
-    """Assemble the full ISO-10303-21 document for the closed polyline ``pts``."""
+    """Assemble the full ISO-10303-21 document for the closed polyline pts."""
     lines: list[str] = []
 
     def emit(entity_id: int, body: str) -> None:
@@ -174,9 +174,9 @@ def _build_step_text(pts: np.ndarray, *, name: str) -> str:
 def _fmt(value: float) -> str:
     """Format a float as a valid STEP real literal (must contain a decimal point).
 
-    Python's ``repr`` can emit exponent forms like ``1e-06`` whose mantissa has no
-    decimal point, which is invalid STEP. This normalizes those to ``1.E-06`` and
-    appends a trailing ``.`` to bare integers, preserving full ``repr`` precision.
+    Python's repr can emit exponent forms like 1e-06 whose mantissa has no
+    decimal point, which is invalid STEP. This normalizes those to 1.E-06 and
+    appends a trailing "." to bare integers, preserving full repr precision.
     """
     s = repr(float(value))
     if "e" in s or "E" in s:

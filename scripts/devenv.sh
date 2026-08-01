@@ -5,7 +5,7 @@
 # Why this exists: pip installs prebuilt manylinux wheels whose C-extensions are
 # dynamically linked against libstdc++, libz, libgomp, libGL, etc. On a standard
 # distro these live in /usr/lib; on NixOS they live in the Nix store and are not
-# on the default loader path, so `import numpy` fails with "libstdc++.so.6: cannot
+# on the default loader path, so importing numpy fails with "libstdc++.so.6: cannot
 # open shared object file". We resolve the needed lib dirs from <nixpkgs> (no
 # hardcoded store hashes, GC-safe) and prepend them to LD_LIBRARY_PATH.
 #
@@ -21,6 +21,23 @@ _NIX_EXPR='with import <nixpkgs> {}; lib.makeLibraryPath [
   stdenv.cc.cc.lib   # libstdc++.so.6, libgomp.so.1
   zlib               # libz.so.1
   glib               # libgthread/glib (trimesh, pyvista optional deps)
+
+  # VTK (pyvista, the optional viz extra) dlopens GL + X11 at render time, both
+  # for an on-screen window and for off-screen screenshots. Without these,
+  # creating a Plotter aborts with "Failed to load an X11 library".
+  libGL              # libGL.so.1
+  libglvnd           # libOpenGL/libGLX dispatch
+  libx11             # libX11.so.6
+  libxext
+  libxrender
+  libxcursor
+  libxrandr
+  libxinerama
+  libxi
+  libxfixes
+  libsm
+  libice
+  libxkbcommon
 ]'
 
 _FITTING_LIBS="$(nix eval --raw --impure --expr "$_NIX_EXPR")"

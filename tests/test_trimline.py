@@ -1,7 +1,7 @@
 """Tests for the trim-line rule engine against the synthetic mesh.
 
-Builds a ``LandmarkSet`` programmatically on the normalized synthetic mesh (no
-GUI), runs :func:`generate_trimline`, and asserts the loop is closed, on the
+Builds a LandmarkSet programmatically on the normalized synthetic mesh (no
+GUI), runs generate_trimline, and asserts the loop is closed, on the
 surface, correctly sized, and monotonic around the axis -- plus that a rule
 parameter (posterior trim height) actually moves the curve.
 """

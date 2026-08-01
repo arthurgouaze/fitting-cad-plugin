@@ -23,10 +23,10 @@ dependencies = [
 
 [project.optional-dependencies]
 # Interactive viewer + point-picking landmark UI. Kept optional: it pulls in the
-# heavy GL/VTK stack (pyvista) and open3d, which lack wheels on some interpreters
-# (e.g. open3d has no cp313 wheel as of 2026-06). The core trim-line pipeline
-# (io / landmarks math / trimline / cli) runs without these.
-viz = ["pyvista>=0.43", "open3d>=0.18"]
+# heavy GL/VTK stack, which needs a working OpenGL driver and is dead weight for
+# headless/CI runs. The core trim-line pipeline (io / landmarks math / trimline /
+# cli with --landmarks) runs without it.
+viz = ["pyvista>=0.43"]
 dev = ["pytest>=8.0", "ruff>=0.5"]
 
 [project.scripts]

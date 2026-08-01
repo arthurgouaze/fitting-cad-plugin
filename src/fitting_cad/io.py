@@ -36,15 +36,15 @@ def load_mesh(path: str | Path) -> trimesh.Trimesh:
     silently coerced -- reconstruction and scene splitting are separate steps.
 
     Args:
-        path: Path to an ``.stl`` or ``.ply`` file.
+        path: Path to an .stl or .ply file.
 
     Returns:
-        A single :class:`trimesh.Trimesh` with at least one face.
+        A single trimesh.Trimesh with at least one face.
 
     Raises:
         FileNotFoundError: The path does not exist.
         ValueError: The suffix is unsupported, or the loaded geometry is not a
-            single non-empty surface mesh (e.g. a point cloud or ``Scene``).
+            single non-empty surface mesh (e.g. a point cloud or Scene).
     """
     path = Path(path)
     if not path.exists():
@@ -90,17 +90,17 @@ def normalize_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
 
     Canonical frame:
 
-    * The limb long axis is aligned to **+Z**.
-    * The **proximal rim** (the wide, open socket-opening end of a transtibial
-      residual limb) sits at **Z = 0**, and the distal end runs toward **+Z**.
-    * The origin is the centroid of the proximal-rim cross-section, so trim-line
+    - The limb long axis is aligned to +Z.
+    - The proximal rim (the wide, open socket-opening end of a transtibial
+      residual limb) sits at Z = 0, and the distal end runs toward +Z.
+    - The origin is the centroid of the proximal-rim cross-section, so trim-line
       rules can be expressed as frame-independent offsets down the limb.
 
     The long axis is estimated by PCA on the vertices (the principal axis of
     greatest variance). The proximal/distal sign is fixed deterministically: a
     residual limb tapers distally, so the wider end is proximal. We compare the
     cross-sectional spread of vertices in the slab near each end of the axis and
-    orient so the **wider end is proximal (Z = 0)** and the narrower end is +Z.
+    orient so the wider end is proximal (Z = 0) and the narrower end is +Z.
 
     The input mesh is not mutated; a transformed copy is returned.
 
@@ -108,7 +108,7 @@ def normalize_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
         mesh: A surface mesh in arbitrary scanner coordinates.
 
     Returns:
-        A new :class:`trimesh.Trimesh` in the canonical limb frame.
+        A new trimesh.Trimesh in the canonical limb frame.
 
     Raises:
         ValueError: The mesh has no vertices.
@@ -172,10 +172,10 @@ def export_mesh(mesh: trimesh.Trimesh, path: str | Path) -> Path:
 
     Args:
         mesh: The mesh to write.
-        path: Destination path; suffix selects the format (``.stl`` / ``.ply``).
+        path: Destination path; suffix selects the format (.stl / .ply).
 
     Returns:
-        The :class:`~pathlib.Path` that was written.
+        The pathlib.Path that was written.
 
     Raises:
         ValueError: The suffix is not a supported export format.
@@ -197,22 +197,22 @@ def export_mesh(mesh: trimesh.Trimesh, path: str | Path) -> Path:
 def export_curve(curve: np.ndarray, path: str | Path) -> Path:
     """Export the ordered closed trim curve as CAD/CAM-ready STEP.
 
-    The loop is written as a single ``POLYLINE`` inside a millimetre AP214
-    wireframe shape (see :mod:`fitting_cad.step_writer`). trimesh has no STEP
+    The loop is written as a single POLYLINE inside a millimetre AP214
+    wireframe shape (see fitting_cad.step_writer). trimesh has no STEP
     writer and a full OCCT bridge (cascadio/OCP/build123d) is far too heavy just
     to serialize a curve, so this uses a small dependency-free text writer.
 
     Args:
-        curve: An ``(N, 3)`` array of ordered loop vertices (mm) in the canonical
-            frame. ``N`` must be at least 3.
-        path: Destination ``.step`` / ``.stp`` path.
+        curve: An (N, 3) array of ordered loop vertices (mm) in the canonical
+            frame. N must be at least 3.
+        path: Destination .step / .stp path.
 
     Returns:
-        The :class:`~pathlib.Path` written.
+        The pathlib.Path written.
 
     Raises:
-        ValueError: The suffix is not ``.step`` / ``.stp``, or the curve is not a
-            valid ``(N >= 3, 3)`` array of finite points.
+        ValueError: The suffix is not .step / .stp, or the curve is not a
+            valid (N >= 3, 3) array of finite points.
     """
     path = Path(path)
     suffix = path.suffix.lower()
@@ -226,7 +226,7 @@ def export_curve(curve: np.ndarray, path: str | Path) -> Path:
 
 
 def _rotation_between(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Return a rotation matrix mapping unit vector ``a`` onto unit vector ``b``.
+    """Return a rotation matrix mapping unit vector a onto unit vector b.
 
     Uses Rodrigues' formula. Handles the parallel and anti-parallel degenerate
     cases explicitly.
@@ -260,7 +260,7 @@ def _rotation_between(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def _axis_angle(axis: np.ndarray, angle: float) -> np.ndarray:
-    """Rotation matrix for ``angle`` radians about a unit ``axis``."""
+    """Rotation matrix for angle radians about a unit axis."""
     axis = axis / np.linalg.norm(axis)
     x, y, z = axis
     c, s = np.cos(angle), np.sin(angle)

@@ -1,10 +1,13 @@
 """End-to-end CLI pipeline tests, run headless against the synthetic mesh.
 
-Exercises ``cli.main(["fit", ...])`` over the full
-``load -> normalize -> landmarks -> generate -> write`` path using a
+Exercises cli.main(["fit", ...]) over the full
+load -> normalize -> landmarks -> generate -> write path using a
 canonical-frame landmark sidecar (no interactive picker, no GUI), and checks the
-handled error paths (omitted ``--landmarks``, unsupported STEP output) exit
-non-zero with clean messages rather than tracebacks.
+handled error paths exit non-zero with clean messages rather than tracebacks.
+
+The GUI-backed paths (fit falling through to the interactive picker, and the
+view subcommand) are covered with the picker / viewer entry points patched
+out, so the wiring is tested without ever opening a window.
 """
 
 from __future__ import annotations
@@ -13,10 +16,11 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
-from fitting_cad import io
+from fitting_cad import cli, io
 from fitting_cad.cli import main
-from fitting_cad.landmarks import Landmark, snap_to_surface
+from fitting_cad.landmarks import Landmark, LandmarkSet, snap_to_surface
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 SYNTHETIC = EXAMPLES / "synthetic_limb.stl"
@@ -96,14 +100,85 @@ def test_fit_default_output_beside_scan(tmp_path):
     assert (tmp_path / "limb.trimline.json").exists()
 
 
-def test_fit_without_landmarks_exits_with_actionable_message(tmp_path, capsys):
+def _landmark_set_for(mesh) -> LandmarkSet:
+    """The same canonical-frame landmarks as the sidecar, as a LandmarkSet."""
+    z = np.asarray(mesh.vertices)[:, 2]
+    band_z = float(z.min() + 0.25 * (z.max() - z.min()))
+
+    def at(angle: float):
+        return snap_to_surface(mesh, [80.0 * np.cos(angle), 80.0 * np.sin(angle), band_z])
+
+    return LandmarkSet.from_dict(
+        {
+            Landmark.PATELLAR_TENDON: at(0.0),
+            Landmark.MEDIAL_CONDYLE: at(np.pi / 2 * 0.8),
+            Landmark.LATERAL_CONDYLE: at(-np.pi / 2 * 0.8),
+            Landmark.FIBULAR_HEAD: at(np.pi / 2),
+            Landmark.POPLITEAL: at(np.pi),
+        }
+    )
+
+
+def test_fit_without_landmarks_runs_the_picker_and_saves_a_sidecar(tmp_path, monkeypatch, capsys):
+    """--landmarks omitted falls through to the picker; the picked set persists."""
+    scan = tmp_path / "limb.stl"
+    scan.write_bytes(SYNTHETIC.read_bytes())
+    seen = {}
+
+    def fake_picker(mesh, save_path=None, **kwargs):
+        seen["save_path"] = save_path
+        landmarks = _landmark_set_for(mesh)
+        from fitting_cad.landmarks import save_landmarks_json
+
+        save_landmarks_json(landmarks, save_path)
+        return landmarks
+
+    monkeypatch.setattr(cli, "place_landmarks", fake_picker)
+
+    code = main(["fit", str(scan)])
+
+    assert code == 0
+    # Default sidecar lands beside the scan, in the canonical frame.
+    assert seen["save_path"] == tmp_path / "limb.landmarks.json"
+    assert (tmp_path / "limb.landmarks.json").exists()
+    assert (tmp_path / "limb.trimline.json").exists()
+    assert "Traceback" not in capsys.readouterr().out
+
+
+def test_fit_save_landmarks_overrides_the_default_path(tmp_path, monkeypatch):
+    scan = tmp_path / "limb.stl"
+    scan.write_bytes(SYNTHETIC.read_bytes())
+    target = tmp_path / "picked" / "session.json"
+
+    def fake_picker(mesh, save_path=None, **kwargs):
+        from fitting_cad.landmarks import save_landmarks_json
+
+        landmarks = _landmark_set_for(mesh)
+        save_landmarks_json(landmarks, save_path)
+        return landmarks
+
+    monkeypatch.setattr(cli, "place_landmarks", fake_picker)
+
+    code = main(["fit", str(scan), "--save-landmarks", str(target)])
+
+    assert code == 0
+    assert target.exists()
+
+
+def test_fit_without_viz_extra_exits_with_actionable_message(monkeypatch, capsys):
+    """No pyvista -> a clean message pointing at the extra and --landmarks."""
+
+    def no_pyvista(mesh, save_path=None, **kwargs):
+        raise ImportError("pyvista is not installed. Install it with: pip install -e '.[dev,viz]'")
+
+    monkeypatch.setattr(cli, "place_landmarks", no_pyvista)
+
     code = main(["fit", str(SYNTHETIC)])
 
     assert code != 0
     out = capsys.readouterr().out
     assert "--landmarks" in out
-    assert "not implemented" in out.lower()
-    # No raw traceback leaked.
+    assert "viz" in out
     assert "Traceback" not in out
 
 
@@ -125,10 +200,76 @@ def test_fit_step_output_writes_valid_step(tmp_path, capsys):
     assert "Traceback" not in captured
 
 
-def test_view_subcommand_clean_stub_message(capsys):
+class _ShowSpy:
+    """Stand-in for viewer.show that records what the CLI handed it."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, mesh, landmarks=None, trimline=None, **kwargs):
+        self.calls.append({"mesh": mesh, "landmarks": landmarks, "trimline": trimline, **kwargs})
+
+
+def test_view_opens_the_normalized_mesh(monkeypatch):
+    spy = _ShowSpy()
+    monkeypatch.setattr(cli.viewer, "show", spy)
+
+    code = main(["view", str(SYNTHETIC)])
+
+    assert code == 0
+    (call,) = spy.calls
+    assert call["landmarks"] is None and call["trimline"] is None
+    assert call["off_screen"] is False
+    # Normalized frame: the proximal rim sits at Z = 0.
+    assert np.asarray(call["mesh"].vertices)[:, 2].min() == pytest.approx(0.0, abs=10.0)
+
+
+def test_view_overlays_landmarks_and_trimline(tmp_path, monkeypatch, capsys):
+    sidecar = _write_landmark_sidecar(tmp_path / "landmarks.json")
+    spy = _ShowSpy()
+    monkeypatch.setattr(cli.viewer, "show", spy)
+
+    code = main(["view", str(SYNTHETIC), "--landmarks", str(sidecar), "--trimline"])
+
+    assert code == 0
+    (call,) = spy.calls
+    assert call["landmarks"].missing() == []
+    assert call["trimline"].shape == (180, 3)
+    out = capsys.readouterr().out
+    assert "landmark" in out and "trim line" in out
+
+
+def test_view_screenshot_renders_off_screen(tmp_path, monkeypatch):
+    shot = tmp_path / "scene.png"
+    spy = _ShowSpy()
+    monkeypatch.setattr(cli.viewer, "show", spy)
+
+    code = main(["view", str(SYNTHETIC), "--screenshot", str(shot)])
+
+    assert code == 0
+    (call,) = spy.calls
+    assert call["off_screen"] is True
+    assert call["screenshot"] == shot
+
+
+def test_view_trimline_without_landmarks_errors(capsys):
+    code = main(["view", str(SYNTHETIC), "--trimline"])
+
+    assert code != 0
+    out = capsys.readouterr().out
+    assert "--landmarks" in out
+    assert "Traceback" not in out
+
+
+def test_view_without_viz_extra_exits_cleanly(monkeypatch, capsys):
+    def no_pyvista(*args, **kwargs):
+        raise ImportError("pyvista is not installed. Install it with: pip install -e '.[dev,viz]'")
+
+    monkeypatch.setattr(cli.viewer, "show", no_pyvista)
+
     code = main(["view", str(SYNTHETIC)])
 
     assert code != 0
     out = capsys.readouterr().out
-    assert "not implemented" in out.lower()
+    assert "viz" in out
     assert "Traceback" not in out

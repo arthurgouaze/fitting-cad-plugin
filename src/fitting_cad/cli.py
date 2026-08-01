@@ -2,13 +2,15 @@
 
 Roadmap: Week 8 (clinician wrapper).
 
-Thin wrapper that wires the pipeline together::
+Thin wrapper that wires the pipeline together:
 
     load -> normalize -> place landmarks -> generate trim line -> export
 
-The ``fit`` subcommand runs headless: pass a landmark sidecar with
-``--landmarks`` so no interactive picker is required (the picker, #6, is still a
-stub). The ``view`` subcommand needs the viewer (#7) and is still a stub.
+The fit subcommand runs headless when given a landmark sidecar with
+--landmarks; without one it opens the interactive picker (which needs the
+optional viz extra) and saves the picked sidecar for reproducibility. The
+view subcommand opens the same scan, landmarks, and trim curve in the 3D
+viewer, or captures them off-screen with --screenshot.
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from fitting_cad import io
+from fitting_cad import io, viewer
 from fitting_cad.landmarks import load_landmarks_json, place_landmarks
 from fitting_cad.trimline import generate_trimline, validate_trimline
 
@@ -66,13 +68,46 @@ def build_parser() -> argparse.ArgumentParser:
             "long axis +Z, proximal rim at Z=0, origin at the rim centroid), not "
             "raw scanner coordinates. Each landmark is snapped to the nearest "
             "normalized-mesh vertex for robustness. If omitted, the interactive "
-            "picker would run -- but that is not implemented yet (#6), so pass "
-            "this for now."
+            "picker opens instead (needs the 'viz' extra)."
+        ),
+    )
+    fit.add_argument(
+        "--save-landmarks",
+        type=Path,
+        help=(
+            "where to persist the landmarks picked interactively (canonical "
+            "frame). Only used when --landmarks is omitted. Defaults to "
+            "'<scan-stem>.landmarks.json' beside the scan."
         ),
     )
 
-    sub.add_parser("view", help="open a scan in the viewer").add_argument(
-        "scan", type=Path, help="input limb scan (STL/PLY)"
+    view = sub.add_parser(
+        "view",
+        help="open a scan in the 3D viewer",
+        description=(
+            "Load a limb scan, normalize it into the canonical frame, and show it "
+            "in the 3D viewer with optional landmark and trim-curve overlays. "
+            "Needs the optional 'viz' extra (pyvista)."
+        ),
+    )
+    view.add_argument("scan", type=Path, help="input limb scan (STL/PLY)")
+    view.add_argument(
+        "--landmarks",
+        type=Path,
+        help=(
+            "JSON sidecar of landmark name -> [x, y, z] in the CANONICAL frame; "
+            "overlaid as labelled spheres."
+        ),
+    )
+    view.add_argument(
+        "--trimline",
+        action="store_true",
+        help="also generate the trim curve and overlay it (requires --landmarks)",
+    )
+    view.add_argument(
+        "--screenshot",
+        type=Path,
+        help="render off-screen and write this PNG instead of opening a window",
     )
 
     return parser
@@ -107,16 +142,25 @@ def _run_fit(args: argparse.Namespace) -> int:
             print(f"Error: {exc}")
             return 1
     else:
+        sidecar_out = (
+            args.save_landmarks
+            if args.save_landmarks is not None
+            else _default_landmarks_out(args.scan)
+        )
         try:
-            landmarks = place_landmarks(normalized)
-        except NotImplementedError:
+            landmarks = place_landmarks(normalized, save_path=sidecar_out)
+        except ImportError as exc:
             print(
-                "Error: the interactive landmark picker is not implemented yet "
-                "(#6). Pass --landmarks PATH with a JSON sidecar of landmark "
-                "name -> [x, y, z] in the canonical frame (placed on the "
-                "normalized mesh) to run the pipeline headless."
+                f"Error: {exc}\n"
+                "Alternatively pass --landmarks PATH with a JSON sidecar of "
+                "landmark name -> [x, y, z] in the canonical frame to run the "
+                "pipeline headless."
             )
             return 1
+        except ValueError as exc:
+            print(f"Error: {exc}")
+            return 1
+        print(f"Landmarks: {len(landmarks.points)} placed -> {sidecar_out}")
 
     missing = landmarks.missing()
     if missing:
@@ -153,12 +197,60 @@ def _run_fit(args: argparse.Namespace) -> int:
 
 
 def _run_view(args: argparse.Namespace) -> int:
-    """The viewer subcommand. Still a stub (#7); fail cleanly, no traceback."""
-    print(
-        "Error: the interactive viewer is not implemented yet (#7). Use 'fit' "
-        "with --landmarks to run the headless pipeline for now."
-    )
-    return 1
+    """Load + normalize a scan and show it (with overlays) in the 3D viewer."""
+    try:
+        mesh = io.load_mesh(args.scan)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+    normalized = io.normalize_orientation(mesh)
+
+    landmarks = None
+    if args.landmarks is not None:
+        try:
+            landmarks = load_landmarks_json(args.landmarks, mesh=normalized)
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"Error: {exc}")
+            return 1
+
+    curve = None
+    if args.trimline:
+        if landmarks is None:
+            print(
+                "Error: --trimline needs landmarks; pass --landmarks PATH with a "
+                "canonical-frame sidecar to generate the curve."
+            )
+            return 1
+        try:
+            curve = generate_trimline(normalized, landmarks)
+        except ValueError as exc:
+            print(f"Error: {exc}")
+            return 1
+
+    off_screen = args.screenshot is not None
+    try:
+        viewer.show(
+            normalized,
+            landmarks=landmarks,
+            trimline=curve,
+            off_screen=off_screen,
+            screenshot=args.screenshot,
+        )
+    except ImportError as exc:
+        print(f"Error: {exc}")
+        return 1
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    overlays = []
+    if landmarks is not None:
+        overlays.append(f"{len(landmarks.points)} landmark(s)")
+    if curve is not None:
+        overlays.append(f"trim line ({len(curve)} points)")
+    summary = f"Viewed {args.scan.name}" + (f" with {', '.join(overlays)}" if overlays else "")
+    print(f"{summary} -> {args.screenshot}" if off_screen else summary)
+    return 0
 
 
 def _default_out(scan: Path) -> Path:
@@ -166,11 +258,16 @@ def _default_out(scan: Path) -> Path:
     return scan.with_name(f"{scan.stem}.trimline.json")
 
 
+def _default_landmarks_out(scan: Path) -> Path:
+    """Default picked-landmark sidecar beside the scan: '<scan-stem>.landmarks.json'."""
+    return scan.with_name(f"{scan.stem}.landmarks.json")
+
+
 def _write_curve(curve: np.ndarray, path: Path) -> Path:
     """Write the ordered curve points; format inferred from the suffix.
 
-    ``.json`` -> list of ``[x, y, z]``; ``.csv`` -> header + rows; ``.npy`` ->
-    raw array. ``.step``/``.stp`` route to :func:`io.export_curve`, which writes a
+    .json -> list of [x, y, z]; .csv -> header + rows; .npy ->
+    raw array. .step/.stp route to io.export_curve, which writes a
     CAD/CAM-ready STEP polyline.
 
     Raises:

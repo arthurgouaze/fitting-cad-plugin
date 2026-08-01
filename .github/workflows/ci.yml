@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -23,9 +23,9 @@ jobs:
 
       # On ubuntu the manylinux wheels (numpy, trimesh, rtree, ...) and ruff run
       # directly -- no NixOS LD_LIBRARY_PATH / loader shims. We install the dev
-      # extra only (pytest + ruff); the viz extra (pyvista/open3d, heavy GL/VTK,
-      # no cp31x wheel on some interpreters) is deliberately skipped to keep CI
-      # light and headless.
+      # extra only (pytest + ruff); the viz extra (pyvista, heavy GL/VTK, needs a
+      # working OpenGL driver) is deliberately skipped to keep CI light and
+      # headless -- the viewer tests skip themselves when pyvista is absent.
       - name: Install package (dev extra)
         run: |
           python -m pip install --upgrade pip

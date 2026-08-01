@@ -6,14 +6,14 @@ Generate the socket trim line (rim curve) from anatomical landmarks using
 clinical convention, rather than learned/ML methods. The curve is what a
 prosthetist would otherwise draw by hand on every socket.
 
-Canonical frame (set by :func:`fitting_cad.io.normalize_orientation`):
+Canonical frame (set by fitting_cad.io.normalize_orientation):
 
-* limb long axis -> **+Z**, proximal rim at ``Z = 0`` (wide end),
-* limb tapers toward **+Z**, origin at the proximal-rim centroid.
+- limb long axis -> +Z, proximal rim at Z = 0 (wide end),
+- limb tapers toward +Z, origin at the proximal-rim centroid.
 
-**Anterior direction.** This engine fixes **+X as anterior** in the canonical
+Anterior direction. This engine fixes +X as anterior in the canonical
 frame (so -X is posterior, and +/-Y are the medial/lateral sides). The
-normalization step pins the long axis and origin but does *not* yet pin the
+normalization step pins the long axis and origin but does not yet pin the
 rotation about Z, so this is a convention the interactive/clinical layer must
 ultimately enforce (e.g. by rotating the frame so the patellar tendon sits at
 +X). A prosthetist should confirm the anterior axis before the curve is trusted
@@ -39,13 +39,13 @@ class TrimRules:
     Defaults are placeholders -- calibrate against clinician-reviewed examples.
 
     Attributes:
-        anterior_offset_mm: How much **lower** (toward the rim, ``-Z``) the trim
+        anterior_offset_mm: How much lower (toward the rim, -Z) the trim
             dips anteriorly, over the patellar tendon, to relieve the patella.
             Larger -> more anterior relief.
-        posterior_height_mm: How much **higher** (toward the distal end, ``+Z``)
+        posterior_height_mm: How much higher (toward the distal end, +Z)
             the trim rises posteriorly for the popliteal trim. Larger -> a higher
             posterior wall.
-        smoothing: Loop smoothing strength in ``[0, 1]``. ``0`` leaves the
+        smoothing: Loop smoothing strength in [0, 1]. 0 leaves the
             ray-sampled loop as-is; higher values apply more angular smoothing of
             the height profile for a cleaner rim.
     """
@@ -72,39 +72,39 @@ def generate_trimline(
     First-pass geometric rule engine. The loop wraps the limb once and lies on
     the mesh surface, so it can be lofted into a socket rim or exported.
 
-    Algorithm (all in the canonical frame; clinical parameters in ``rules`` are
+    Algorithm (all in the canonical frame; clinical parameters in rules are
     explicit placeholders to be calibrated later):
 
-    1. **Base height.** Anchor a base trim height ``z0`` off the landmark
+    1. Base height. Anchor a base trim height z0 off the landmark
        Z-heights -- the mean Z of the placed required landmarks. This puts the
        rim in the right band down the limb without hard-coding a number.
-    2. **Angular height profile.** Sweep angles ``theta in [0, 2*pi)``. Build a
-       smooth target height ``z(theta)`` that dips anteriorly (near +X, the
-       patellar-tendon region) by ``anterior_offset_mm`` and rises posteriorly
-       (near -X, the popliteal) by ``posterior_height_mm``. The dip/rise use a
-       ``cos(theta)`` weighting so the transition through the medial/lateral
+    2. Angular height profile. Sweep angles theta in [0, 2*pi). Build a
+       smooth target height z(theta) that dips anteriorly (near +X, the
+       patellar-tendon region) by anterior_offset_mm and rises posteriorly
+       (near -X, the popliteal) by posterior_height_mm. The dip/rise use a
+       cos(theta) weighting so the transition through the medial/lateral
        walls (+/-Y) is smooth.
-    3. **Optional smoothing.** Blend the height profile toward its angular mean
-       by ``smoothing`` for a cleaner rim.
-    4. **Project onto the surface.** For each ``theta`` at height ``z(theta)``,
-       cast a ray from the limb axis (``x = y = 0`` at that ``z``) outward along
-       ``(cos theta, sin theta, 0)`` and take the farthest mesh-surface hit (the
+    3. Optional smoothing. Blend the height profile toward its angular mean
+       by smoothing for a cleaner rim.
+    4. Project onto the surface. For each theta at height z(theta),
+       cast a ray from the limb axis (x = y = 0 at that z) outward along
+       (cos theta, sin theta, 0) and take the farthest mesh-surface hit (the
        outer wall). Misses are dropped and back-filled by interpolation from
        their angular neighbours.
-    5. **Close + resample.** Order by ``theta``, close the loop, and resample to
-       a uniform ``resolution`` points.
+    5. Close + resample. Order by theta, close the loop, and resample to
+       a uniform resolution points.
 
     Args:
         mesh: A watertight limb mesh in the canonical frame.
         landmarks: Placed landmarks; the required subset anchors the base height.
-        rules: Clinical parameters. Defaults to :class:`TrimRules` placeholders.
+        rules: Clinical parameters. Defaults to TrimRules placeholders.
         resolution: Number of points in the returned loop.
 
     Returns:
-        An ``(resolution, 3)`` float64 array: an ordered, closed, on-surface loop.
+        An (resolution, 3) float64 array: an ordered, closed, on-surface loop.
 
     Raises:
-        ValueError: Landmarks are missing, ``resolution`` is too small, or no
+        ValueError: Landmarks are missing, resolution is too small, or no
             surface intersections could be found (degenerate mesh/placement).
     """
     if rules is None:
@@ -152,7 +152,7 @@ def _project_rays_to_surface(
 ) -> np.ndarray:
     """Ray-cast outward from the axis at each (theta, z); take the outer hit.
 
-    Returns an ``(N, 3)`` array ordered by ``theta``. Angles whose ray misses
+    Returns an (N, 3) array ordered by theta. Angles whose ray misses
     the surface are back-filled by interpolating the radius from their nearest
     angular neighbours that did hit, so the loop stays continuous.
     """
@@ -208,8 +208,8 @@ def _project_rays_to_surface(
 def _resample_closed_loop(points: np.ndarray, resolution: int) -> np.ndarray:
     """Resample an ordered open polyline into a uniform closed loop.
 
-    Treats ``points`` as samples around a closed loop (already ordered by angle),
-    closes it, and resamples to ``resolution`` points evenly spaced by arc length.
+    Treats points as samples around a closed loop (already ordered by angle),
+    closes it, and resamples to resolution points evenly spaced by arc length.
     """
     closed = np.vstack([points, points[0]])
     seg = np.linalg.norm(np.diff(closed, axis=0), axis=1)
@@ -233,24 +233,24 @@ def validate_trimline(curve: np.ndarray, mesh: trimesh.Trimesh) -> dict:
 
     Metrics returned:
 
-    * ``point_count``: number of points in the loop.
-    * ``closure_gap``: distance from the last point back to the first
+    - point_count: number of points in the loop.
+    - closure_gap: distance from the last point back to the first
         (loop continuity; should be ~ the mean segment length for a uniform loop).
-    * ``mean_segment_length`` / ``max_segment_length``: spacing diagnostics.
-    * ``max_distance_to_surface``: farthest any loop point sits from the mesh
+    - mean_segment_length / max_segment_length: spacing diagnostics.
+    - max_distance_to_surface: farthest any loop point sits from the mesh
         surface (should be ~0 for an on-surface curve).
-    * ``self_intersections``: count of crossing segment pairs in the XY
+    - self_intersections: count of crossing segment pairs in the XY
         projection (a planar proxy; a clean rim loop should be 0).
 
     Args:
-        curve: An ``(N, 3)`` ordered, closed loop of points.
+        curve: An (N, 3) ordered, closed loop of points.
         mesh: The mesh the curve was generated on.
 
     Returns:
         A dict of the metrics above.
 
     Raises:
-        ValueError: ``curve`` is not an ``(N, 3)`` array with ``N >= 3``.
+        ValueError: curve is not an (N, 3) array with N >= 3.
     """
     curve = np.asarray(curve, dtype=np.float64)
     if curve.ndim != 2 or curve.shape[1] != 3 or curve.shape[0] < 3:
@@ -299,7 +299,7 @@ def _count_xy_self_intersections(xy: np.ndarray) -> int:
 
 
 def _segments_cross(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray) -> bool:
-    """True if open segments ``p1p2`` and ``p3p4`` properly intersect in 2D."""
+    """True if open segments p1p2 and p3p4 properly intersect in 2D."""
 
     def orient(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
         return float((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]))
