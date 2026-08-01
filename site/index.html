@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI-Assisted Fitting CAD Plugin — automated trim lines for transtibial sockets</title>
+<meta name="description" content="Open-source software that automates the trim line, the rim curve a prosthetist draws by hand on every transtibial socket. Apache-2.0.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="AI-Assisted Fitting CAD Plugin">
+<meta property="og:description" content="Open-source software that automates the trim line, the rim curve a prosthetist draws by hand on every transtibial socket.">
+<meta property="og:type" content="website">
+<style>
+  :root {
+    --bg: #14171d;
+    --bg-raised: #1c2027;
+    --bg-sunken: #10131a;
+    --line: #2b313b;
+    --line-soft: #232833;
+    --text: #e7eaf0;
+    --text-dim: #a3adbc;
+    --text-faint: #79839295;
+    --accent: #e0503a;
+    --accent-soft: #e0503a1f;
+    --info: #4f8ef7;
+    --radius: 10px;
+    --measure: 62rem;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    width: 100%;
+    max-width: var(--measure);
+    margin-inline: auto;
+    padding-inline: 1.5rem;
+  }
+
+  section { padding-block: 4.5rem; border-top: 1px solid var(--line-soft); }
+  section:first-of-type { border-top: 0; }
+
+  h1, h2, h3 { line-height: 1.25; letter-spacing: -0.015em; margin: 0; }
+  h1 { font-size: clamp(2rem, 5.2vw, 3.1rem); font-weight: 650; }
+  h2 { font-size: clamp(1.45rem, 3.2vw, 1.9rem); font-weight: 620; }
+  h3 { font-size: 1.05rem; font-weight: 620; }
+  p { margin: 0; }
+
+  a { color: var(--text); text-decoration-color: #ffffff40; text-underline-offset: 3px; }
+  a:hover { text-decoration-color: currentColor; }
+
+  .eyebrow {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 1.6rem;
+  }
+
+  /* --- Hero --- */
+
+  .hero { padding-top: 4rem; padding-bottom: 3.5rem; }
+
+  .lede {
+    font-size: clamp(1.1rem, 2.4vw, 1.35rem);
+    color: var(--text);
+    max-width: 42ch;
+    margin-top: 1.4rem;
+  }
+
+  .sub {
+    color: var(--text-dim);
+    max-width: 56ch;
+    margin-top: 1.1rem;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2.1rem;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 0.62rem 1.15rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    font-size: 0.95rem;
+    font-weight: 550;
+    text-decoration: none;
+    color: var(--text);
+    background: var(--bg-raised);
+  }
+  .btn:hover { border-color: #3d4553; background: #232833; }
+  .btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn--primary:hover { background: #c94530; border-color: #c94530; }
+
+  figure { margin: 3rem 0 0; }
+
+  .shot {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--bg-raised);
+  }
+
+  figcaption {
+    margin-top: 0.85rem;
+    font-size: 0.86rem;
+    color: var(--text-dim);
+    max-width: 62ch;
+  }
+
+  /* --- Steps --- */
+
+  .steps {
+    list-style: none;
+    counter-reset: step;
+    margin: 2.5rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  }
+
+  .steps li {
+    counter-increment: step;
+    background: var(--bg-raised);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    padding: 1.4rem 1.35rem 1.5rem;
+  }
+
+  .steps li::before {
+    content: counter(step);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 0.88rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.95rem;
+  }
+
+  .steps h3 { margin-bottom: 0.4rem; }
+  .steps p { color: var(--text-dim); font-size: 0.95rem; }
+
+  /* --- Prose + lists --- */
+
+  .prose { max-width: 64ch; margin-top: 1.6rem; display: grid; gap: 1.05rem; }
+  .prose p { color: var(--text-dim); }
+  .prose strong { color: var(--text); font-weight: 600; }
+
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.85rem; max-width: 64ch; }
+  .checks li { position: relative; padding-left: 1.4rem; color: var(--text-dim); }
+  .checks li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.66em;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .checks strong { color: var(--text); font-weight: 600; }
+
+  .callout {
+    margin-top: 2rem;
+    padding: 1.2rem 1.35rem;
+    background: var(--bg-sunken);
+    border: 1px solid var(--line-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    max-width: 64ch;
+  }
+  .callout strong { color: var(--text); font-weight: 600; }
+
+  /* --- Contact --- */
+
+  .contact { display: grid; gap: 1.4rem; max-width: 64ch; margin-top: 1.6rem; }
+  .contact p { color: var(--text-dim); }
+  .contact a { color: var(--text); }
+
+  .contact-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.6rem;
+    font-size: 0.95rem;
+    padding-top: 0.3rem;
+  }
+
+  /* --- Footer --- */
+
+  footer {
+    border-top: 1px solid var(--line-soft);
+    padding-block: 2.2rem 3rem;
+    font-size: 0.88rem;
+    color: var(--text-dim);
+  }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; justify-content: space-between; }
+
+  @media (max-width: 40rem) {
+    body { font-size: 16px; }
+    section { padding-block: 3.25rem; }
+    .hero { padding-top: 3rem; }
+    .actions .btn { flex: 1 1 auto; text-align: center; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a, .btn { transition: background-color 120ms ease, border-color 120ms ease; }
+  }
+</style>
+</head>
+<body>
+
+<main>
+
+  <section class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Open-source socket fitting</p>
+      <h1>AI-Assisted Fitting&nbsp;CAD Plugin</h1>
+      <p class="lede">
+        Software that automates the trim line — the rim curve a prosthetist draws by
+        hand on every transtibial socket.
+      </p>
+      <p class="sub">
+        Load a limb scan, mark the anatomical landmarks you already look for, and the
+        software proposes the rim curve. The fitting core is free and open source.
+      </p>
+      <div class="actions">
+        <a class="btn btn--primary" href="https://github.com/arthurgouaze/fitting-cad-plugin">View the project on GitHub</a>
+        <a class="btn" href="#contact">Get in touch</a>
+      </div>
+
+      <figure>
+        <img class="shot" src="assets/hero.png" width="1600" height="1000"
+             alt="A 3D limb model with seven labelled anatomical landmarks and a generated trim curve drawn in red around the socket rim.">
+        <figcaption>
+          Automated trim line on a synthetic demo limb — not a patient scan. The blue
+          markers are the placed landmarks; the red loop is the curve the rule engine
+          generated from them.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <p class="eyebrow">How it works</p>
+      <h2>Four steps, from scan to a curve you can cut to</h2>
+      <ol class="steps">
+        <li>
+          <h3>Import the scan</h3>
+          <p>
+            Open a limb scan from your scanner in a standard mesh format. The software
+            works out the limb's long axis and puts every case in the same orientation,
+            so nothing depends on how the scan happened to be captured.
+          </p>
+        </li>
+        <li>
+          <h3>Mark the landmarks</h3>
+          <p>
+            Click about seven anatomical points — patellar tendon, tibial tubercle,
+            fibular head, the condyles, the popliteal. Each click snaps onto the surface,
+            and the set is saved next to the scan so a case can be reopened exactly as
+            you left it.
+          </p>
+        </li>
+        <li>
+          <h3>Generate the trim curve</h3>
+          <p>
+            A rule engine draws the rim from those landmarks: relief at the front over
+            the patellar tendon, a higher wall at the back over the popliteal, and smooth
+            transitions through the medial and lateral walls. The curve is checked for a
+            closed loop that sits on the surface without crossing itself.
+          </p>
+        </li>
+        <li>
+          <h3>Export to your workflow</h3>
+          <p>
+            Write the curve out as STEP for CAD/CAM, or take the model out as STL for
+            3D printing. It hands off to the carving, milling and printing tools your
+            lab already runs.
+          </p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="open-source">
+    <div class="wrap">
+      <p class="eyebrow">Why open source</p>
+      <h2>Free to adopt, and open to inspection</h2>
+      <div class="prose">
+        <p>
+          The fitting core is released under the <strong>Apache&nbsp;2.0</strong> licence.
+          There is nothing to buy to try it, and nothing stopping a clinic, a fabricator
+          or a researcher from using and adapting it — including commercially.
+        </p>
+        <p>
+          It is built to <strong>fit an existing workflow, not replace one</strong>. Standard
+          mesh formats in, standard CAD/CAM formats out. It sits between the scanner you
+          already own and the software you already use, and it automates one repetitive
+          step rather than asking you to move your practice onto a new platform.
+        </p>
+        <p>
+          Open source also means the clinical logic is <strong>readable, not a black
+          box</strong>. The trim-line rules are explicit, adjustable parameters. If you
+          disagree with what the software does, you can see exactly what it did and change
+          it.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="status">
+    <div class="wrap">
+      <p class="eyebrow">Where the project stands</p>
+      <h2>Working pipeline, uncalibrated rules</h2>
+      <ul class="checks">
+        <li>
+          <strong>The pipeline runs end to end today</strong> on synthetic demo geometry:
+          import, orientation, landmark placement, trim-curve generation, 3D view, and
+          export. The image above is real output, not a mock-up.
+        </li>
+        <li>
+          <strong>The clinical parameters are placeholders.</strong> The values that
+          control how far the rim drops at the front and rises at the back are starting
+          points, not settled clinical practice.
+        </li>
+        <li>
+          <strong>It has not been validated on patient scans</strong>, and it is not a
+          medical device or a substitute for clinical judgement.
+        </li>
+      </ul>
+      <div class="callout">
+        <strong>I am looking for prosthetists to review generated curves.</strong>
+        The most useful thing anyone can tell me right now is where a proposed trim line
+        is wrong and why — too high posteriorly, not enough relief anteriorly, wrong
+        through the walls. Your judgment calibrates the defaults. A short conversation
+        over a few example curves is enough to move this forward.
+      </div>
+    </div>
+  </section>
+
+  <section id="contact">
+    <div class="wrap">
+      <p class="eyebrow">About</p>
+      <h2>Who is building this</h2>
+      <div class="contact">
+        <p>
+          I am Arthur Gouaze. I am building this under the iStem venture program, starting
+          from a simple observation: the trim line is drawn by hand on every transtibial
+          socket, it takes real time, and it is one of the parts of the process a computer
+          can genuinely help with.
+        </p>
+        <p>
+          If you fit or fabricate transtibial sockets, I would like to hear how you draw
+          the trim line and what would have to be true for software to be worth your time.
+          I am equally glad to hear that this is the wrong problem to solve.
+        </p>
+        <div class="contact-links">
+          <a href="mailto:arthurgouaze@gmail.com">arthurgouaze@gmail.com</a>
+          <a href="https://github.com/arthurgouaze/fitting-cad-plugin">github.com/arthurgouaze/fitting-cad-plugin</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>AI-Assisted Fitting CAD Plugin — part of the iStem venture program</span>
+    <span>
+      <a href="https://github.com/arthurgouaze/fitting-cad-plugin">Source on GitHub</a>
+      · <a href="https://github.com/arthurgouaze/fitting-cad-plugin/blob/main/LICENSE">Apache-2.0</a>
+    </span>
+  </div>
+</footer>
+
+</body>
+</html>
