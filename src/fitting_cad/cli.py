@@ -4,7 +4,7 @@ Roadmap: Week 8 (clinician wrapper).
 
 Thin wrapper that wires the pipeline together:
 
-    load -> normalize -> place landmarks -> generate trim line -> export
+    load -> clean -> normalize -> place landmarks -> generate trim line -> export
 
 The fit subcommand runs headless when given a landmark sidecar with
 --landmarks; without one it opens the interactive picker (which needs the
@@ -17,19 +17,26 @@ from __future__ import annotations
 
 import argparse
 import csv
+import dataclasses
 import json
 from pathlib import Path
 
 import numpy as np
+import trimesh
 
 from fitting_cad import io, viewer
 from fitting_cad.landmarks import load_landmarks_json, place_landmarks
-from fitting_cad.trimline import generate_trimline, validate_trimline
+from fitting_cad.trimline import TrimRules, generate_trimline, validate_trimline
 
 # Curve output formats. Ordered-point formats are written here; .step/.stp route
 # to io.export_curve, which writes a CAD/CAM-ready STEP polyline.
 _POINT_SUFFIXES = {".json", ".csv", ".npy"}
 _STEP_SUFFIXES = {".step", ".stp"}
+
+# TrimRules fields exposed as fit flags: every numeric clinical parameter.
+_RULE_FIELDS = [
+    f for f in dataclasses.fields(TrimRules) if isinstance(f.default, (int, float))
+]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -48,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
             "curve points out."
         ),
     )
-    fit.add_argument("scan", type=Path, help="input limb scan (STL/PLY)")
+    fit.add_argument("scan", type=Path, help="input limb scan (STL/PLY/OBJ)")
     fit.add_argument(
         "-o",
         "--out",
@@ -67,8 +74,10 @@ def build_parser() -> argparse.ArgumentParser:
             "interpreted in the CANONICAL frame (placed on the NORMALIZED mesh: "
             "long axis +Z, proximal rim at Z=0, origin at the rim centroid), not "
             "raw scanner coordinates. Each landmark is snapped to the nearest "
-            "normalized-mesh vertex for robustness. If omitted, the interactive "
-            "picker opens instead (needs the 'viz' extra)."
+            "normalized-mesh vertex. If omitted, the interactive "
+            "picker opens instead (needs the 'viz' extra). A sidecar is tied "
+            "to the --clean setting it was placed with, since cleanup can shift "
+            "the canonical frame slightly."
         ),
     )
     fit.add_argument(
@@ -80,6 +89,21 @@ def build_parser() -> argparse.ArgumentParser:
             "'<scan-stem>.landmarks.json' beside the scan."
         ),
     )
+    _add_clean_arguments(fit)
+    rules = fit.add_argument_group(
+        "trim rules",
+        "clinical parameters of the rule engine; defaults are uncalibrated "
+        "placeholders",
+    )
+    for f in _RULE_FIELDS:
+        rules.add_argument(
+            f"--{f.name.replace('_', '-')}",
+            dest=f.name,
+            type=float,
+            default=f.default,
+            metavar="VALUE",
+            help=f"TrimRules.{f.name} (default: {f.default})",
+        )
 
     view = sub.add_parser(
         "view",
@@ -90,7 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Needs the optional 'viz' extra (pyvista)."
         ),
     )
-    view.add_argument("scan", type=Path, help="input limb scan (STL/PLY)")
+    view.add_argument("scan", type=Path, help="input limb scan (STL/PLY/OBJ)")
     view.add_argument(
         "--landmarks",
         type=Path,
@@ -109,32 +133,50 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="render off-screen and write this PNG instead of opening a window",
     )
+    _add_clean_arguments(view)
 
     return parser
+
+
+def _add_clean_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add the mesh-cleanup options shared by fit and view."""
+    parser.add_argument(
+        "--clean",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "repair the scan before normalization: merge duplicate vertices, "
+            "drop degenerate and duplicate faces, fix winding, cap small holes, "
+            "rescale metre scans to mm (default: on)"
+        ),
+    )
+    parser.add_argument(
+        "--max-faces",
+        type=int,
+        metavar="N",
+        help=(
+            "with --clean, decimate the scan to at most N faces (needs the "
+            "'decimate' extra)"
+        ),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "fit":
         return _run_fit(args)
-    if args.command == "view":
-        return _run_view(args)
-    # argparse(required=True) prevents reaching here, but be explicit.
-    print(f"Unknown command {args.command!r}.")
-    return 2
+    return _run_view(args)
 
 
 def _run_fit(args: argparse.Namespace) -> int:
-    """Run load -> normalize -> landmarks -> generate -> write. Returns exit code."""
-    # --- Load + normalize ----------------------------------------------------
-    try:
-        mesh = io.load_mesh(args.scan)
-    except (FileNotFoundError, ValueError) as exc:
-        print(f"Error: {exc}")
-        return 1
-    normalized = io.normalize_orientation(mesh)
+    """Run load -> clean -> normalize -> landmarks -> generate -> write.
 
-    # --- Obtain landmarks (canonical frame) ----------------------------------
+    Returns the exit code.
+    """
+    normalized = _load_normalized(args)
+    if normalized is None:
+        return 1
+
     if args.landmarks is not None:
         try:
             landmarks = load_landmarks_json(args.landmarks, mesh=normalized)
@@ -168,14 +210,13 @@ def _run_fit(args: argparse.Namespace) -> int:
         print(f"Error: landmark sidecar is missing required landmarks: {names}.")
         return 1
 
-    # --- Generate the trim curve ---------------------------------------------
+    rules = TrimRules(**{f.name: getattr(args, f.name) for f in _RULE_FIELDS})
     try:
-        curve = generate_trimline(normalized, landmarks)
+        curve = generate_trimline(normalized, landmarks, rules=rules)
     except ValueError as exc:
         print(f"Error: {exc}")
         return 1
 
-    # --- Resolve output path + write -----------------------------------------
     out_path = args.out if args.out is not None else _default_out(args.scan)
     try:
         written = _write_curve(curve, out_path)
@@ -183,7 +224,6 @@ def _run_fit(args: argparse.Namespace) -> int:
         print(f"Error: {exc}")
         return 1
 
-    # --- Summary + validation metrics ----------------------------------------
     metrics = validate_trimline(curve, normalized)
     print(f"Trim line: {len(curve)} points -> {written}")
     print(
@@ -197,13 +237,10 @@ def _run_fit(args: argparse.Namespace) -> int:
 
 
 def _run_view(args: argparse.Namespace) -> int:
-    """Load + normalize a scan and show it (with overlays) in the 3D viewer."""
-    try:
-        mesh = io.load_mesh(args.scan)
-    except (FileNotFoundError, ValueError) as exc:
-        print(f"Error: {exc}")
+    """Load, clean, and normalize a scan and show it (with overlays) in the viewer."""
+    normalized = _load_normalized(args)
+    if normalized is None:
         return 1
-    normalized = io.normalize_orientation(mesh)
 
     landmarks = None
     if args.landmarks is not None:
@@ -236,10 +273,7 @@ def _run_view(args: argparse.Namespace) -> int:
             off_screen=off_screen,
             screenshot=args.screenshot,
         )
-    except ImportError as exc:
-        print(f"Error: {exc}")
-        return 1
-    except ValueError as exc:
+    except (ImportError, ValueError) as exc:
         print(f"Error: {exc}")
         return 1
 
@@ -251,6 +285,25 @@ def _run_view(args: argparse.Namespace) -> int:
     summary = f"Viewed {args.scan.name}" + (f" with {', '.join(overlays)}" if overlays else "")
     print(f"{summary} -> {args.screenshot}" if off_screen else summary)
     return 0
+
+
+def _load_normalized(args: argparse.Namespace) -> trimesh.Trimesh | None:
+    """Load args.scan, clean it unless --no-clean, and normalize it.
+
+    Prints the error and returns None when the scan cannot be used.
+    """
+    try:
+        mesh = io.load_mesh(args.scan)
+        if args.clean:
+            mesh, report = io.clean_mesh(mesh, max_faces=args.max_faces)
+            print(f"Cleanup: {report.summary()}")
+        elif args.max_faces is not None:
+            print("Error: --max-faces needs --clean.")
+            return None
+    except (FileNotFoundError, ValueError, ImportError) as exc:
+        print(f"Error: {exc}")
+        return None
+    return io.normalize_orientation(mesh)
 
 
 def _default_out(scan: Path) -> Path:

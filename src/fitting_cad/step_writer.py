@@ -9,7 +9,7 @@ Why hand-rolled instead of an OCCT bridge:
 - cascadio (trimesh's OCCT bridge) only reads STEP -> GLB; it cannot write
   STEP, and a wireframe curve would not survive a mesh conversion anyway.
 - build123d / OCP pull in the multi-hundred-megabyte cadquery-ocp
-  OCCT bindings whose wheels are fragile on Python 3.13 / NixOS -- far too heavy
+  OCCT bindings whose wheels are fragile on Python 3.13 / NixOS, far too heavy
   just to serialize a polyline.
 
 STEP is a plain-text format, so a small, well-formed AP214 writer is the lightest
@@ -20,7 +20,7 @@ Entity schema (AP214 AUTOMOTIVE_DESIGN, a widely-imported STEP flavor):
 - A minimal product structure (APPLICATION_CONTEXT -> PRODUCT ->
   PRODUCT_DEFINITION -> PRODUCT_DEFINITION_SHAPE) so the curve opens as a
   named part rather than orphan geometry.
-- A units context in millimetres (SI_UNIT(.MILLI.,.METRE.)) -- the limb
+- A units context in millimetres (SI_UNIT(.MILLI.,.METRE.)): the limb
   frame is metric mm, and CAM tools need explicit units.
 - One CARTESIAN_POINT per loop vertex.
 - A single POLYLINE through those points. A polyline preserves the exact
@@ -37,7 +37,7 @@ point so the wire forms a closed rim.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -157,7 +157,7 @@ def _build_step_text(pts: np.ndarray, *, name: str) -> str:
     sdr_id = rep_id + 1
     emit(sdr_id, f"SHAPE_DEFINITION_REPRESENTATION(#8,#{rep_id})")
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
     header = (
         "ISO-10303-21;\n"
         "HEADER;\n"

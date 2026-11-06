@@ -22,7 +22,7 @@ for a real socket.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 class TrimRules:
     """Tunable clinical parameters for trim-line generation.
 
-    Defaults are placeholders -- calibrate against clinician-reviewed examples.
+    Defaults are placeholders, to be calibrated against clinician-reviewed examples.
 
     Attributes:
         anterior_offset_mm: How much lower (toward the rim, -Z) the trim
@@ -54,8 +54,6 @@ class TrimRules:
     posterior_height_mm: float = 10.0  # popliteal trim rise (placeholder)
     smoothing: float = 0.3  # height-profile smoothing in [0, 1]
 
-    extra: dict = field(default_factory=dict)
-
 
 # Anterior is +X in the canonical frame (documented in the module docstring).
 _ANTERIOR = np.array([1.0, 0.0, 0.0])
@@ -63,7 +61,7 @@ _ANTERIOR = np.array([1.0, 0.0, 0.0])
 
 def generate_trimline(
     mesh: trimesh.Trimesh,
-    landmarks: "LandmarkSet",
+    landmarks: LandmarkSet,
     rules: TrimRules | None = None,
     resolution: int = 180,
 ) -> np.ndarray:
@@ -75,9 +73,9 @@ def generate_trimline(
     Algorithm (all in the canonical frame; clinical parameters in rules are
     explicit placeholders to be calibrated later):
 
-    1. Base height. Anchor a base trim height z0 off the landmark
-       Z-heights -- the mean Z of the placed required landmarks. This puts the
-       rim in the right band down the limb without hard-coding a number.
+    1. Base height. Anchor a base trim height z0 at the mean Z of every
+       placed landmark, optional ones included. This puts the rim in the
+       right band down the limb without hard-coding a number.
     2. Angular height profile. Sweep angles theta in [0, 2*pi). Build a
        smooth target height z(theta) that dips anteriorly (near +X, the
        patellar-tendon region) by anterior_offset_mm and rises posteriorly
@@ -96,7 +94,8 @@ def generate_trimline(
 
     Args:
         mesh: A watertight limb mesh in the canonical frame.
-        landmarks: Placed landmarks; the required subset anchors the base height.
+        landmarks: Placed landmarks; the required set must be present, and
+            every placed landmark contributes to the base height.
         rules: Clinical parameters. Defaults to TrimRules placeholders.
         resolution: Number of points in the returned loop.
 
@@ -118,10 +117,7 @@ def generate_trimline(
         raise ValueError(f"Cannot generate trim line; missing landmarks: {names}.")
 
     # --- 1. Base height from the landmark Z-band -----------------------------
-    landmark_z = np.array(
-        [landmarks.points[lm][2] for lm in landmarks.points], dtype=np.float64
-    )
-    z0 = float(landmark_z.mean())
+    z0 = float(np.mean([point[2] for point in landmarks.points.values()]))
 
     # --- 2. Angular height profile -------------------------------------------
     theta = np.linspace(0.0, 2.0 * np.pi, resolution, endpoint=False)
@@ -143,8 +139,7 @@ def generate_trimline(
     points = _project_rays_to_surface(mesh, theta, z_profile)
 
     # --- 5. Close + resample to a uniform loop -------------------------------
-    loop = _resample_closed_loop(points, resolution)
-    return loop
+    return _resample_closed_loop(points, resolution)
 
 
 def _project_rays_to_surface(
@@ -256,27 +251,25 @@ def validate_trimline(curve: np.ndarray, mesh: trimesh.Trimesh) -> dict:
     if curve.ndim != 2 or curve.shape[1] != 3 or curve.shape[0] < 3:
         raise ValueError(f"curve must be an (N, 3) array with N >= 3, got {curve.shape}.")
 
-    n = curve.shape[0]
-
     # Closure + spacing (treat as a closed loop: last segment wraps to first).
     wrapped = np.vstack([curve, curve[0]])
     seg_len = np.linalg.norm(np.diff(wrapped, axis=0), axis=1)
     closure_gap = float(np.linalg.norm(curve[-1] - curve[0]))
 
     # Distance to surface for every loop point.
-    closest, distance, _ = trimesh.proximity.closest_point(mesh, curve)
+    _closest, distance, _ = trimesh.proximity.closest_point(mesh, curve)
     max_dist = float(np.max(distance))
 
     # Self-intersection count in the XY projection.
-    self_int = _count_xy_self_intersections(curve[:, :2])
+    self_intersections = _count_xy_self_intersections(curve[:, :2])
 
     return {
-        "point_count": int(n),
+        "point_count": curve.shape[0],
         "closure_gap": closure_gap,
         "mean_segment_length": float(seg_len.mean()),
         "max_segment_length": float(seg_len.max()),
         "max_distance_to_surface": max_dist,
-        "self_intersections": int(self_int),
+        "self_intersections": self_intersections,
     }
 
 

@@ -8,8 +8,7 @@ These drive the rule-based trim-curve generation in fitting_cad.trimline.
 This module keeps the non-interactive parts (the LandmarkSet
 container, a nearest-vertex snap helper, the sidecar reader/writer, and the
 _PickSession state machine) free of any GUI / GL dependency so they are
-testable headless. Only place_landmarks touches pyvista, and it imports
-it lazily.
+testable headless. place_landmarks imports pyvista lazily.
 """
 
 from __future__ import annotations
@@ -41,10 +40,9 @@ class Landmark(str, Enum):
 
 # Landmarks the first-pass trim-line rule engine needs to anchor its z(theta)
 # profile. The patellar tendon anchors the anterior relief, the popliteal anchors
-# the posterior (higher) trim, and the fibular head + condyles fix the
-# medial/lateral wall heights. The patella and tibial tubercle are useful context
-# for a clinician but are not strictly required by the current rule, so they are
-# left out of the required set.
+# the posterior (higher) trim, and the fibular head and condyles fix the
+# medial/lateral wall heights. The patella and the tibial tubercle are useful
+# context for a clinician but optional: the current rule does not need them.
 REQUIRED_LANDMARKS: tuple[Landmark, ...] = (
     Landmark.PATELLAR_TENDON,
     Landmark.FIBULAR_HEAD,
@@ -56,25 +54,24 @@ REQUIRED_LANDMARKS: tuple[Landmark, ...] = (
 # Order the interactive picker walks the clinician through. Declaration order of
 # Landmark, i.e. anterior/proximal first (patella, patellar tendon,
 # tibial tubercle), then the medial/lateral walls, then the posterior popliteal
-# reference last -- the same sweep a prosthetist marks by hand.
+# reference last.
 PICK_ORDER: tuple[Landmark, ...] = tuple(Landmark)
 
 
 @dataclass
 class LandmarkSet:
-    """Resolved 3D positions for each placed landmark (model coordinates)."""
+    """Resolved model coordinates for each placed landmark."""
 
     points: dict[Landmark, np.ndarray] = field(default_factory=dict)
 
     @classmethod
     def from_dict(
-        cls, points: "Mapping[Landmark, np.ndarray | list[float] | tuple[float, ...]]"
+        cls, points: Mapping[Landmark, np.ndarray | list[float] | tuple[float, ...]]
     ) -> LandmarkSet:
-        """Build a LandmarkSet from a mapping of landmark -> point.
+        """Build a LandmarkSet from a mapping of a landmark to a point.
 
-        Each value is coerced to a (3,) float64 array. This is the
-        non-interactive entry point used by tests and by callers that already
-        have landmark coordinates (e.g. loaded from a persisted JSON sidecar).
+        Each value is converted to a (3,) float64 array. This is the
+        non-interactive entry point for coordinates obtained elsewhere.
 
         Args:
             points: Mapping from Landmark to a 3D point.
@@ -90,7 +87,7 @@ class LandmarkSet:
             arr = np.asarray(point, dtype=np.float64).reshape(-1)
             if arr.shape != (3,):
                 raise ValueError(
-                    f"Landmark {landmark.value!r} must be a 3D point, got shape "
+                    f"Landmark {landmark.value!r} must be a 3D point, got a shape "
                     f"{np.asarray(point).shape}."
                 )
             resolved[landmark] = arr
@@ -111,7 +108,7 @@ def snap_to_surface(mesh: trimesh.Trimesh, point: np.ndarray) -> np.ndarray:
     A clinician's pick (or a programmatic landmark) rarely lands exactly on a
     mesh vertex; snapping to the nearest vertex keeps landmark positions
     reproducible and tied to concrete mesh geometry. Uses trimesh's vertex
-    KD-tree (mesh.kdtree), so it is GUI-free and fast.
+    KD-tree (mesh.kdtree) to remain GUI-free and fast.
 
     Args:
         mesh: The mesh whose vertices are candidate snap targets.
@@ -121,16 +118,16 @@ def snap_to_surface(mesh: trimesh.Trimesh, point: np.ndarray) -> np.ndarray:
         A (3,) float64 copy of the nearest mesh vertex.
 
     Raises:
-        ValueError: point is not a 3-vector, or the mesh has no vertices.
+        ValueError: The point is not a 3-vector, or the mesh has no vertices.
     """
     p = np.asarray(point, dtype=np.float64).reshape(-1)
     if p.shape != (3,):
-        raise ValueError(f"point must be a 3D point, got shape {np.asarray(point).shape}.")
+        raise ValueError(f"point must be a 3D point, got a shape {np.asarray(point).shape}.")
     vertices = np.asarray(mesh.vertices, dtype=np.float64)
     if vertices.shape[0] == 0:
         raise ValueError("Cannot snap to a mesh with no vertices.")
 
-    # mesh.kdtree is a scipy cKDTree over the vertices; query the single nearest.
+    # mesh.kdtree is a cached scipy cKDTree over the vertices.
     _, index = mesh.kdtree.query(p)
     return vertices[int(index)].copy()
 
@@ -147,21 +144,17 @@ def load_landmarks_json(path: str | Path, mesh: trimesh.Trimesh | None = None) -
             ...
         }
 
-    Coordinate-frame convention. Landmark coordinates are interpreted in the
-    canonical limb frame -- i.e. as if placed on the normalized mesh
-    returned by fitting_cad.io.normalize_orientation (long axis +Z,
-    proximal rim at Z = 0, origin at the proximal-rim centroid), not in
-    raw scanner coordinates. Generate landmarks against the normalized mesh and
-    persist them in that frame. This matters because the pipeline normalizes the
-    mesh before generating the trim line, so a sidecar in scanner coordinates
-    would not line up with the surface.
+    Coordinates are read in the canonical limb frame returned by
+    fitting_cad.io.normalize_orientation (long axis +Z, proximal rim at Z = 0,
+    origin at the proximal-rim centroid), not raw scanner coordinates. The
+    pipeline normalizes the mesh before generating the trim line, so a sidecar
+    in scanner coordinates would not line up with the surface.
 
     Args:
         path: Path to the JSON sidecar.
         mesh: Optional normalized mesh. When given, each landmark is snapped
-            to the nearest mesh vertex via snap_to_surface for
-            robustness, so small off-surface offsets in the sidecar are tied back
-            to concrete geometry.
+            to the nearest mesh vertex via snap_to_surface, so small
+            off-surface offsets in the sidecar are tied back to the geometry.
 
     Returns:
         A LandmarkSet in the canonical frame.
@@ -181,7 +174,9 @@ def load_landmarks_json(path: str | Path, mesh: trimesh.Trimesh | None = None) -
         raise ValueError(f"{path.name} is not valid JSON: {exc}") from exc
 
     if not isinstance(raw, dict):
-        raise ValueError(
+        # Malformed sidecar content, not a bad argument type, so ValueError
+        # keeps the documented contract and the CLI error path intact.
+        raise ValueError(  # noqa: TRY004
             f"{path.name} must be a JSON object mapping landmark name -> [x, y, z], "
             f"got {type(raw).__name__}."
         )
@@ -235,11 +230,11 @@ class _PickSession:
     currently being asked for, snapping an incoming pick to the surface,
     recording it, undoing the last pick, skipping optional landmarks, and
     reporting the on-screen prompt. Keeping this GL-free is what makes the
-    picker's logic unit-testable (feed it synthetic pick events) while the GUI
-    itself is exercised manually.
+    picker's logic unit-testable (feeding it synthetic pick events) while the GUI
+    itself is used manually.
     """
 
-    def __init__(self, mesh: trimesh.Trimesh, order: "Iterable[Landmark] | None" = None) -> None:
+    def __init__(self, mesh: trimesh.Trimesh, order: Iterable[Landmark] | None = None) -> None:
         """Start a picking session over order (defaults to PICK_ORDER).
 
         Args:
@@ -247,7 +242,7 @@ class _PickSession:
             order: The landmark sequence to walk through.
 
         Raises:
-            ValueError: order is empty, or omits a required landmark.
+            ValueError: order is empty or omits a required landmark.
         """
         self.mesh = mesh
         self.order: tuple[Landmark, ...] = tuple(order) if order is not None else PICK_ORDER
@@ -271,7 +266,7 @@ class _PickSession:
         return self.index >= len(self.order)
 
     def record(self, point: np.ndarray) -> tuple[Landmark, np.ndarray]:
-        """Snap point to the surface, store it as the current landmark, advance.
+        """Snap point to the surface, store it as the current landmark, and advance.
 
         Args:
             point: The raw 3D pick position (typically a ray-surface hit).
@@ -292,7 +287,7 @@ class _PickSession:
         return landmark, snapped
 
     def undo(self) -> Landmark | None:
-        """Step back one slot and drop its landmark, so it can be re-picked.
+        """Step back one slot and drop its landmark so it can be re-picked.
 
         Returns:
             The landmark that was stepped back to (now unplaced), or None if
@@ -309,8 +304,8 @@ class _PickSession:
         """Advance past the current landmark without placing it.
 
         Only optional landmarks (those outside REQUIRED_LANDMARKS) may be
-        skipped -- the rule engine cannot anchor its height profile without the
-        required set.
+        skipped, because the rule engine cannot anchor its height profile
+        without the required set.
 
         Returns:
             The landmark that was skipped.
@@ -324,8 +319,7 @@ class _PickSession:
             raise ValueError("All landmarks in the pick order have been placed.")
         if landmark in REQUIRED_LANDMARKS:
             raise ValueError(
-                f"{landmark.value} is required by the trim-line rule engine and "
-                "cannot be skipped."
+                f"{landmark.value} is required by the trim-line rule engine and cannot be skipped."
             )
         self.index += 1
         return landmark
@@ -335,7 +329,7 @@ class _PickSession:
         return [lm for lm in REQUIRED_LANDMARKS if lm not in self.points]
 
     def result(self) -> LandmarkSet:
-        """Return the landmarks placed so far as a LandmarkSet."""
+        """Return the placed landmarks as a LandmarkSet."""
         return LandmarkSet.from_dict(self.points)
 
     def prompt(self, note: str | None = None) -> str:
@@ -350,7 +344,7 @@ class _PickSession:
         keys = "left click = place   |   u = undo last   |   n = skip optional   |   q = finish"
         landmark = self.current
         if landmark is None:
-            head = f"All {len(self.points)} landmark(s) placed - finishing."
+            head = f"All {len(self.points)} landmark(s) have been placed, finishing."
         else:
             optional = "" if landmark in REQUIRED_LANDMARKS else "  (optional)"
             head = (
@@ -367,12 +361,12 @@ def place_landmarks(
     mesh: trimesh.Trimesh,
     save_path: str | Path | None = None,
     *,
-    order: "Iterable[Landmark] | None" = None,
+    order: Iterable[Landmark] | None = None,
 ) -> LandmarkSet:
     """Open the interactive picker and return the placed landmark set.
 
     Opens a pyvista window showing the limb surface and walks the clinician
-    through PICK_ORDER one landmark at a time, naming the current target
+    through PICK_ORDER one landmark at a time while naming the current target
     on screen:
 
     - left click on the surface places the current landmark. The pick is
@@ -386,7 +380,7 @@ def place_landmarks(
 
     Run this on the NORMALIZED mesh (the output of
     fitting_cad.io.normalize_orientation), never on the raw scan. The
-    returned points -- and the sidecar written when save_path is given -- are
+    returned points, and the sidecar written when save_path is given, are
     therefore in the canonical limb frame, which is the frame
     load_landmarks_json and the trim-line rule engine expect. Picking on
     a raw scan produces a sidecar that will not line up with the pipeline.

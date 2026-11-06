@@ -3,8 +3,9 @@
 #
 # Why: ruff's wheel ships a single dynamically-linked native binary built for
 # generic Linux. NixOS has no /lib64/ld-linux loader, so executing it directly
-# fails with "Could not start dynamically linked executable". We invoke the Nix
-# glibc dynamic loader explicitly and provide the runtime libs via devenv.sh.
+# fails with "Could not start dynamically linked executable". This wrapper
+# invokes the Nix glibc dynamic loader explicitly and provides the runtime libs
+# via devenv.sh.
 #
 # Usage: scripts/ruff.sh check .   |   scripts/ruff.sh format .
 set -euo pipefail

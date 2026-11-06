@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from fitting_cad.landmarks import LandmarkSet
 
 # --- Scene palette ---------------------------------------------------------
-# Neutral limb surface so the clinical overlays carry all the colour meaning.
+# Green limb, blue landmarks, red trim line, on a dark background.
 LIMB_COLOR = "#008000"
 LANDMARK_COLOR = "#1f6feb"
 LANDMARK_LABEL_COLOR = "#eef2f7"
@@ -65,7 +65,7 @@ def require_pyvista() -> Any:
     return pv
 
 
-def mesh_to_polydata(mesh: "trimesh.Trimesh") -> Any:
+def mesh_to_polydata(mesh: trimesh.Trimesh) -> Any:
     """Convert a trimesh.Trimesh to a pyvista.PolyData surface.
 
     Built explicitly from vertices + a VTK face array ([3, i, j, k, ...])
@@ -93,7 +93,7 @@ def mesh_to_polydata(mesh: "trimesh.Trimesh") -> Any:
     return pv.PolyData(vertices, padded)
 
 
-def scene_scale(mesh: "trimesh.Trimesh") -> float:
+def scene_scale(mesh: trimesh.Trimesh) -> float:
     """Return the mesh bounding-box diagonal, used to size the overlays.
 
     Args:
@@ -107,8 +107,8 @@ def scene_scale(mesh: "trimesh.Trimesh") -> float:
     return diagonal if diagonal > 0.0 else 1.0
 
 
-def add_limb_surface(plotter: Any, mesh: "trimesh.Trimesh", name: str = "limb") -> Any:
-    """Add the limb surface to plotter (neutral colour, edges off).
+def add_limb_surface(plotter: Any, mesh: trimesh.Trimesh, name: str = "limb") -> Any:
+    """Add the limb surface to plotter (LIMB_COLOR, edges off).
 
     Args:
         plotter: A pyvista.Plotter.
@@ -179,14 +179,12 @@ def remove_landmark_glyph(plotter: Any, name: str) -> None:
         plotter: A pyvista.Plotter.
         name: The landmark name passed to add_landmark_glyph.
     """
+    # remove_actor returns False for an unknown name rather than raising.
     for actor_name in (f"landmark-{name}", f"landmark-label-{name}"):
-        try:
-            plotter.remove_actor(actor_name, render=False)
-        except (KeyError, ValueError):  # pragma: no cover - actor already gone
-            pass
+        plotter.remove_actor(actor_name, render=False)
 
 
-def add_landmark_glyphs(plotter: Any, landmarks: "LandmarkSet", radius: float) -> None:
+def add_landmark_glyphs(plotter: Any, landmarks: LandmarkSet, radius: float) -> None:
     """Add every placed landmark in landmarks as a labelled sphere glyph.
 
     Args:
@@ -226,7 +224,7 @@ def add_trimline(plotter: Any, curve: np.ndarray, radius: float, name: str = "tr
     return plotter.add_mesh(tube, color=TRIMLINE_COLOR, smooth_shading=True, name=name)
 
 
-def frame_camera(plotter: Any, mesh: "trimesh.Trimesh") -> None:
+def frame_camera(plotter: Any, mesh: trimesh.Trimesh) -> None:
     """Point the camera at the limb from the anterolateral side, +Z up.
 
     Args:
@@ -244,8 +242,8 @@ def frame_camera(plotter: Any, mesh: "trimesh.Trimesh") -> None:
 
 
 def show(
-    mesh: "trimesh.Trimesh",
-    landmarks: "LandmarkSet | None" = None,
+    mesh: trimesh.Trimesh,
+    landmarks: LandmarkSet | None = None,
     trimline: np.ndarray | None = None,
     *,
     off_screen: bool = False,
@@ -255,7 +253,7 @@ def show(
 ) -> None:
     """Show the limb mesh with optional landmark and trim-curve overlays.
 
-    The limb renders as a neutral opaque surface, landmarks as labelled spheres,
+    The limb renders as an opaque surface, landmarks as labelled spheres,
     and the trim curve as a contrasting tube, with an orientation-axes widget and
     a camera framed on the limb with +Z up.
 

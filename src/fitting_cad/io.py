@@ -2,41 +2,46 @@
 
 Roadmap: Week 5 (mesh pipeline) and Week 7 (export).
 
-Import a limb scan (STL/PLY), normalize its orientation into a canonical frame,
-and export results as STL (3D print) or STEP (CAD/CAM). Develop against synthetic
-or open limb-scan meshes.
+Import a limb scan (STL/PLY/OBJ), clean it, normalize its orientation into a
+canonical frame, and export results as STL (3D print) or STEP (CAD/CAM).
+Develop against synthetic or open limb-scan meshes.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
 import trimesh
 
 from fitting_cad import step_writer
 
-if TYPE_CHECKING:
-    pass
-
-
 # Suffixes trimesh can round-trip as a single surface mesh for this pipeline.
-_SUPPORTED_MESH_SUFFIXES = {".stl", ".ply"}
+_SUPPORTED_MESH_SUFFIXES = {".stl", ".ply", ".obj"}
 
 # Suffixes the trim curve can be exported to as CAD/CAM geometry.
 _SUPPORTED_CURVE_SUFFIXES = {".step", ".stp"}
 
+# A residual limb is roughly 150-500 mm long. A bounding box whose longest side
+# is below this many units can only be a scan exported in metres.
+_METRE_SCAN_MAX_EXTENT = 0.5
+
+# Boundary loops up to this many edges are scan dropouts and get capped. Longer
+# loops are left open: on a real scan the longest one is usually the deliberate
+# proximal opening, which must not be closed off.
+_DEFAULT_MAX_HOLE_EDGES = 64
+
 
 def load_mesh(path: str | Path) -> trimesh.Trimesh:
-    """Load a limb-scan mesh from STL or PLY.
+    """Load a limb-scan mesh from STL, PLY, or OBJ.
 
     The scan must be a single triangular surface mesh. Point clouds, empty
     geometry, and multi-body scenes are rejected with a clear error rather than
-    silently coerced -- reconstruction and scene splitting are separate steps.
+    silently coerced. Reconstruction and scene splitting are separate steps.
 
     Args:
-        path: Path to an .stl or .ply file.
+        path: Path to an .stl, .ply, or .obj file.
 
     Returns:
         A single trimesh.Trimesh with at least one face.
@@ -63,26 +68,176 @@ def load_mesh(path: str | Path) -> trimesh.Trimesh:
     loaded = trimesh.load(path, force="mesh", process=False)
 
     if isinstance(loaded, trimesh.Scene):
-        # force="mesh" usually concatenates a scene, but an empty scene can slip
-        # through. Treat a leftover Scene as multi-body / unsupported input.
-        raise ValueError(
+        # force="mesh" concatenates most scenes, but an empty one slips through.
+        # ValueError rather than TypeError here and below: the path is valid and
+        # the file content is unusable, and the CLI error handler keys on
+        # ValueError.
+        raise ValueError(  # noqa: TRY004
             f"{path.name} loaded as a multi-body scene; this pipeline expects a "
             "single surface mesh. Split or reconstruct it first."
         )
 
     if not isinstance(loaded, trimesh.Trimesh):
-        raise ValueError(
+        raise ValueError(  # noqa: TRY004
             f"{path.name} did not load as a surface mesh (got "
             f"{type(loaded).__name__}); point clouds are not supported."
         )
 
-    if loaded.faces is None or len(loaded.faces) == 0:
+    if len(loaded.faces) == 0:
         raise ValueError(
             f"{path.name} has no faces; it looks like a point cloud, not a "
             "surface mesh. Reconstruct a surface before importing."
         )
 
     return loaded
+
+
+@dataclass
+class CleanReport:
+    """What clean_mesh changed, so the caller can log or display it.
+
+    Attributes:
+        merged_vertices: Vertices removed by merging coincident positions.
+        degenerate_faces: Zero-area faces dropped.
+        duplicate_faces: Faces dropped because another face used the same
+            three vertices.
+        unreferenced_vertices: Vertices dropped because no face used them.
+        winding_fixed: True when face winding was inconsistent and got
+            repaired so neighbouring faces agree.
+        holes_filled: Boundary loops capped with a fan of new faces.
+        holes_left_open: Boundary loops left open, either longer than the
+            hole-size limit (such as the proximal opening) or not a simple loop.
+        scale_factor: Factor applied to the coordinates; 1000.0 when the
+            scan was detected as metres, otherwise 1.0.
+        faces_before_decimation: Face count before decimation, or None when
+            no decimation ran.
+        faces_after: Face count of the cleaned mesh.
+    """
+
+    merged_vertices: int = 0
+    degenerate_faces: int = 0
+    duplicate_faces: int = 0
+    unreferenced_vertices: int = 0
+    winding_fixed: bool = False
+    holes_filled: int = 0
+    holes_left_open: int = 0
+    scale_factor: float = 1.0
+    faces_before_decimation: int | None = None
+    faces_after: int = 0
+
+    def summary(self) -> str:
+        """One-line, human-readable account of the cleanup."""
+        parts = [
+            f"merged {self.merged_vertices} vertices",
+            (
+                f"dropped {self.degenerate_faces} degenerate and "
+                f"{self.duplicate_faces} duplicate faces"
+            ),
+            f"dropped {self.unreferenced_vertices} unreferenced vertices",
+        ]
+        if self.winding_fixed:
+            parts.append("fixed face winding")
+        parts.append(f"filled {self.holes_filled} holes ({self.holes_left_open} left open)")
+        if self.scale_factor != 1.0:
+            parts.append(f"scaled x{self.scale_factor:g} (metres to mm)")
+        if self.faces_before_decimation is not None:
+            parts.append(
+                f"decimated {self.faces_before_decimation} -> {self.faces_after} faces"
+            )
+        return "; ".join(parts)
+
+
+def clean_mesh(
+    mesh: trimesh.Trimesh,
+    *,
+    max_hole_edges: int = _DEFAULT_MAX_HOLE_EDGES,
+    max_faces: int | None = None,
+) -> tuple[trimesh.Trimesh, CleanReport]:
+    """Return a repaired copy of a raw scan and a report of what changed.
+
+    Steps, in order: merge coincident vertices; drop zero-area and duplicate
+    faces; drop vertices no face uses; make face winding consistent; cap every
+    boundary loop of at most max_hole_edges edges with a fan around its
+    centroid; rescale scans exported in metres to millimetres; and, when
+    max_faces is given, decimate to that face budget.
+
+    Long boundary loops stay open on purpose. A transtibial scan is usually
+    open at the proximal end and that opening is part of the geometry, not a
+    defect.
+
+    The metre check is a bounding-box heuristic: a longest side under 0.5 units
+    cannot be a limb in millimetres, so the scan is scaled by 1000. Scans in
+    centimetres are not detected.
+
+    The input mesh is not mutated.
+
+    Args:
+        mesh: The scan as loaded by load_mesh.
+        max_hole_edges: Largest boundary loop, in edges, that is treated as a
+            hole and capped. Must be at least 3.
+        max_faces: Optional face budget. When the cleaned mesh has more
+            faces, it is decimated with quadric edge collapse, which needs the
+            optional fast-simplification package (the decimate extra).
+
+    Returns:
+        A (cleaned_mesh, report) tuple.
+
+    Raises:
+        ValueError: max_hole_edges or max_faces is out of range, or nothing
+            is left after dropping degenerate faces.
+        ImportError: Decimation was requested but fast-simplification is not
+            installed.
+    """
+    if max_hole_edges < 3:
+        raise ValueError(f"max_hole_edges must be >= 3, got {max_hole_edges}.")
+    if max_faces is not None and max_faces < 4:
+        raise ValueError(f"max_faces must be >= 4, got {max_faces}.")
+
+    report = CleanReport()
+    out = mesh.copy()
+
+    before = len(out.vertices)
+    out.merge_vertices()
+    report.merged_vertices = before - len(out.vertices)
+
+    nondegenerate = out.nondegenerate_faces()
+    report.degenerate_faces = int((~nondegenerate).sum())
+    out.update_faces(nondegenerate)
+
+    unique = out.unique_faces()
+    report.duplicate_faces = int((~unique).sum())
+    out.update_faces(unique)
+
+    if len(out.faces) == 0:
+        raise ValueError("No faces left after dropping degenerate faces.")
+
+    before = len(out.vertices)
+    out.remove_unreferenced_vertices()
+    report.unreferenced_vertices = before - len(out.vertices)
+
+    if not out.is_winding_consistent:
+        trimesh.repair.fix_winding(out)
+        report.winding_fixed = True
+
+    report.holes_filled, report.holes_left_open = _fill_small_holes(out, max_hole_edges)
+
+    if float(out.extents.max()) < _METRE_SCAN_MAX_EXTENT:
+        report.scale_factor = 1000.0
+        out.apply_scale(report.scale_factor)
+
+    if max_faces is not None and len(out.faces) > max_faces:
+        try:
+            import fast_simplification  # noqa: F401
+        except ImportError as exc:
+            raise ImportError(
+                "Decimation needs the optional fast-simplification package; "
+                "install it with: pip install -e '.[decimate]'"
+            ) from exc
+        report.faces_before_decimation = len(out.faces)
+        out = out.simplify_quadric_decimation(face_count=max_faces)
+
+    report.faces_after = len(out.faces)
+    return out, report
 
 
 def normalize_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
@@ -98,9 +253,10 @@ def normalize_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
 
     The long axis is estimated by PCA on the vertices (the principal axis of
     greatest variance). The proximal/distal sign is fixed deterministically: a
-    residual limb tapers distally, so the wider end is proximal. We compare the
-    cross-sectional spread of vertices in the slab near each end of the axis and
-    orient so the wider end is proximal (Z = 0) and the narrower end is +Z.
+    residual limb tapers distally, so the wider end is proximal. The
+    cross-sectional spread of vertices in the slab near each end of the axis is
+    compared, and the mesh is oriented so the wider end is proximal (Z = 0)
+    and the narrower end is +Z.
 
     The input mesh is not mutated; a transformed copy is returned.
 
@@ -124,7 +280,6 @@ def normalize_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
     cov = np.cov(centered, rowvar=False)
     eigvals, eigvecs = np.linalg.eigh(cov)
     long_axis = eigvecs[:, int(np.argmax(eigvals))]
-    long_axis = long_axis / np.linalg.norm(long_axis)
 
     # --- 2. Provisional rotation that maps long_axis -> +Z --------------------
     z_hat = np.array([0.0, 0.0, 1.0])
@@ -148,16 +303,10 @@ def normalize_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
     if high_spread > low_spread:
         flip = np.diag([1.0, -1.0, -1.0])  # 180 deg about X keeps +Z handedness
         rotated = rotated @ flip.T
-        z = rotated[:, 2]
-        z_min = float(z.min())
 
     # --- 4. Translate proximal-rim centroid to the origin ---------------------
-    # Recompute the proximal slab after any flip and use its XY/Z centroid so the
-    # rim cross-section centroid lands at the origin.
-    z_min = float(rotated[:, 2].min())
-    span = float(rotated[:, 2].max()) - z_min
-    slab = max(span * 0.1, 1e-9)
-    rim_mask = rotated[:, 2] <= (z_min + slab)
+    # A flip leaves the span unchanged, so only the low end needs recomputing.
+    rim_mask = rotated[:, 2] <= float(rotated[:, 2].min()) + slab
     rim_centroid = rotated[rim_mask].mean(axis=0)
 
     canonical = rotated - rim_centroid
@@ -168,11 +317,11 @@ def normalize_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
 
 
 def export_mesh(mesh: trimesh.Trimesh, path: str | Path) -> Path:
-    """Export a mesh to STL or PLY. Format inferred from the path suffix.
+    """Export a mesh to STL, PLY, or OBJ. Format inferred from the path suffix.
 
     Args:
         mesh: The mesh to write.
-        path: Destination path; suffix selects the format (.stl / .ply).
+        path: Destination path; suffix selects the format (.stl / .ply / .obj).
 
     Returns:
         The pathlib.Path that was written.
@@ -225,6 +374,63 @@ def export_curve(curve: np.ndarray, path: str | Path) -> Path:
     return step_writer.write_step_polyline(curve, path)
 
 
+def _fill_small_holes(mesh: trimesh.Trimesh, max_edges: int) -> tuple[int, int]:
+    """Cap boundary loops of at most max_edges edges in place.
+
+    Each loop is closed with a fan of triangles around a new vertex at the loop
+    centroid, wound against the boundary edge so the cap faces the same way as
+    the surrounding surface. Loops through a non-manifold boundary vertex are
+    left open.
+
+    Returns:
+        A (filled, left_open) count of boundary loops.
+    """
+    boundary = trimesh.grouping.group_rows(mesh.edges_sorted, require_count=1)
+    if len(boundary) == 0:
+        return 0, 0
+
+    # mesh.edges keeps each face's winding, so (a, b) runs along the boundary
+    # in the direction the adjacent face traverses it.
+    directed = mesh.edges[boundary]
+    successor: dict[int, int] = {}
+    branching: set[int] = set()
+    for a, b in directed.tolist():
+        if a in successor:
+            branching.add(a)
+        successor[a] = b
+
+    loops: list[list[int]] = []
+    visited: set[int] = set()
+    for start, current in successor.items():
+        if start in visited:
+            continue
+        loop = [start]
+        visited.add(start)
+        while current != start and current in successor and current not in visited:
+            loop.append(current)
+            visited.add(current)
+            current = successor[current]
+        loops.append(loop if current == start else [])
+
+    vertices = [np.asarray(mesh.vertices)]
+    faces = [np.asarray(mesh.faces)]
+    next_index = len(mesh.vertices)
+    filled = 0
+    for loop in loops:
+        if not loop or len(loop) > max_edges or branching.intersection(loop):
+            continue
+        ring = np.asarray(loop)
+        vertices.append(np.asarray(mesh.vertices)[ring].mean(axis=0, keepdims=True))
+        faces.append(np.column_stack([np.roll(ring, -1), ring, np.full(len(ring), next_index)]))
+        next_index += 1
+        filled += 1
+
+    if filled:
+        mesh.vertices = np.vstack(vertices)
+        mesh.faces = np.vstack(faces)
+    return filled, len(loops) - filled
+
+
 def _rotation_between(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Return a rotation matrix mapping unit vector a onto unit vector b.
 
@@ -245,9 +451,7 @@ def _rotation_between(a: np.ndarray, b: np.ndarray) -> np.ndarray:
         orth = np.array([1.0, 0.0, 0.0])
         if abs(a[0]) > 0.9:
             orth = np.array([0.0, 1.0, 0.0])
-        axis = np.cross(a, orth)
-        axis = axis / np.linalg.norm(axis)
-        return _axis_angle(axis, np.pi)
+        return _axis_angle(np.cross(a, orth), np.pi)
 
     vx = np.array(
         [
@@ -280,8 +484,6 @@ def _xy_spread(points: np.ndarray) -> float:
     A proxy for cross-sectional width used to tell the wide (proximal) end of a
     tapered limb from the narrow (distal) end.
     """
-    if points.shape[0] == 0:
-        return 0.0
     xy = points[:, :2]
     center = xy.mean(axis=0)
     radii = np.linalg.norm(xy - center, axis=1)

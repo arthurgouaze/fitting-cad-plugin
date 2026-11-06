@@ -1,8 +1,8 @@
 """Reproducible generator for the synthetic transtibial limb mesh.
 
 Produces examples/synthetic_limb.stl: a closed, tapered, slightly elliptical
-tube standing in for a transtibial residual limb. It is deliberately simple --
-no patient data is involved -- but has the properties the pipeline needs:
+tube standing in for a transtibial residual limb. It is deliberately simple,
+and involves no patient data, but has the properties the pipeline needs:
 
 - a clear long axis (so PCA orientation has something to lock onto),
 - a wide proximal end and a narrower, rounded distal end (so the
@@ -39,10 +39,10 @@ def build_synthetic_limb() -> trimesh.Trimesh:
     Topology (kept watertight after an STL round-trip):
 
     - N_RINGS rings of N_THETA vertices form the side wall. Every ring,
-      including the last, keeps a non-zero radius -- earlier versions tapered
-      the final rings to radius 0, collapsing them into degenerate zero-area
-      triangles that trimesh (and the STL round-trip) split off, breaking
-      watertightness. The distal end is closed by a single pole vertex instead.
+      including the last, keeps a non-zero radius: a ring tapered to radius 0
+      collapses into zero-area triangles that trimesh and the STL round-trip
+      split off, breaking watertightness. The distal end is closed by a single
+      pole vertex instead.
     - A proximal rim cap fans the open socket end (ring 0) to a centre vertex.
     - A distal pole cap fans the last ring to one tip vertex below it, giving a
       rounded, closed distal pole with no degenerate faces.
@@ -86,13 +86,13 @@ def build_synthetic_limb() -> trimesh.Trimesh:
 
     points = grid.reshape(-1, 3).tolist()
 
-    # Proximal rim cap (ring 0) -- close the open socket end with a fan.
+    # Proximal rim cap (ring 0): close the open socket end with a fan.
     prox_center = len(points)
     points.append([0.0, 0.0, 0.0])
     for ci in range(N_THETA):
         faces.append([prox_center, idx(0, ci + 1), idx(0, ci)])
 
-    # Distal pole cap -- fan the last (non-degenerate) ring to a single tip vertex
+    # Distal pole cap: fan the last (non-degenerate) ring to a single tip vertex
     # placed a little beyond the collar, giving a rounded closed pole.
     distal_center = len(points)
     points.append([0.0, 0.0, LENGTH + 0.12 * LENGTH * (1.0 - DISTAL_SCALE)])
@@ -103,9 +103,8 @@ def build_synthetic_limb() -> trimesh.Trimesh:
     mesh = trimesh.Trimesh(
         vertices=np.array(points), faces=np.array(faces), process=True
     )
-    # Faces are emitted with consistent outward winding by construction, so we
-    # avoid trimesh.fix_normals() (which pulls in the optional networkx graph
-    # stack) and keep this generator's dependency surface to numpy + scipy.
+    # Both caps traverse their ring in the same direction as the adjacent side
+    # wall faces, so the winding is inconsistent; io.clean_mesh repairs it.
 
     # Pose it off-canonical: rotate the long axis off +Z and translate away from
     # the origin, so normalize_orientation has a non-trivial job.
@@ -120,7 +119,7 @@ def main() -> Path:
     out = Path(__file__).parent / "synthetic_limb.stl"
     mesh.export(out)
     print(
-        f"Wrote {out} -- {len(mesh.vertices)} verts, {len(mesh.faces)} faces, "
+        f"Wrote {out}: {len(mesh.vertices)} verts, {len(mesh.faces)} faces, "
         f"watertight={mesh.is_watertight}"
     )
     return out

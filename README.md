@@ -3,13 +3,14 @@
 > Open-core CAD layer that automates the repetitive manual parts of transtibial
 > prosthetic socket **fitting**. Part of the **iStem** venture.
 
-The first target is automated **socket trim-line generation** — the rim curve a
+The first target is automated **socket trim-line generation**: the rim curve a
 prosthetist currently draws by hand on every socket. The workflow is rule-based:
 
 ```
-limb scan (STL/PLY)
+limb scan (STL/PLY/OBJ)
+  → clean (merge, repair, cap small holes, metre-to-mm)
   → normalize orientation
-  → clinician places ~6–8 anatomical landmarks
+  → clinician places ~6-8 anatomical landmarks
   → rule engine generates the trim curve from clinical convention
   → export CAD/CAM-ready geometry (STL for 3D print, STEP for CAD/CAM)
 ```
@@ -21,23 +22,28 @@ revenue is planned later from a proprietary managed tier.
 
 Early build, but the pipeline runs end to end:
 
-- **I/O** — `io.load_mesh` (STL/PLY import with point-cloud/scene rejection),
+- **I/O:** `io.load_mesh` (STL/PLY/OBJ import with point-cloud/scene rejection),
+  `io.clean_mesh` (vertex merge, degenerate/duplicate face removal, winding fix,
+  small-hole capping, metre-to-mm rescale, optional decimation),
   `io.normalize_orientation` (PCA long-axis → +Z, proximal rim at origin),
-  `io.export_mesh` (STL/PLY).
-- **Trim-line rule engine** — `trimline.generate_trimline` projects a
+  `io.export_mesh` (STL/PLY/OBJ).
+- **Trim-line rule engine:** `trimline.generate_trimline` projects a
   clinician-tunable `TrimRules` height profile onto the limb surface and returns
   a closed, on-surface loop; `trimline.validate_trimline` reports closure gap,
   distance to surface, and self-intersections.
-- **STEP export** — `io.export_curve` writes the trim loop as a CAD/CAM-ready
+- **STEP export:** `io.export_curve` writes the trim loop as a CAD/CAM-ready
   AP214 polyline (no CAD kernel required).
-- **Viewer** — `viewer.show` renders the limb, labelled landmark glyphs, and the
+- **Viewer:** `viewer.show` renders the limb, labelled landmark glyphs, and the
   trim curve; supports off-screen PNG capture.
-- **Interactive landmark picker** — `landmarks.place_landmarks` walks the
+- **Interactive landmark picker:** `landmarks.place_landmarks` walks the
   clinician through the landmark sequence with click-to-place, undo, and skip,
   snapping each pick to the nearest mesh vertex and persisting a canonical-frame
   JSON sidecar.
-- **CLI** — `fitting-cad fit` (headless with `--landmarks`, or interactive) and
-  `fitting-cad view`.
+- **CLI:** `fitting-cad fit` (headless with `--landmarks`, or interactive) and
+  `fitting-cad view`. Cleanup runs by default (`--no-clean` skips it,
+  `--max-faces N` decimates with the `decimate` extra), and every `TrimRules`
+  parameter has a `fit` flag (`--anterior-offset-mm`, `--posterior-height-mm`,
+  `--smoothing`).
 
 A committed synthetic limb mesh (`examples/synthetic_limb.stl`) backs the tests.
 The viewer and picker need the optional `viz` extra
@@ -51,7 +57,7 @@ Python mesh stack (no full CAD kernel):
 - **geometry:** [`trimesh`](https://trimesh.org) + `numpy` / `scipy`, with
   `rtree` for the ray-mesh queries the rule engine uses
 - **viewer / picking:** [`pyvista`](https://pyvista.org) (optional `viz` extra)
-- **export:** STL / PLY / STEP
+- **export:** STL / PLY / OBJ / STEP
 
 Develop on **synthetic or open limb-scan meshes** so nothing waits on IRB.
 
@@ -101,6 +107,10 @@ them with the optional `viz` extra:
 
 # generate a trim line, picking landmarks interactively (saves a sidecar)
 fitting-cad fit examples/synthetic_limb.stl -o trimline.step
+
+# rerun headless from the sidecar with tuned rules
+fitting-cad fit examples/synthetic_limb.stl --landmarks synthetic_limb.landmarks.json \
+  --anterior-offset-mm 20 --posterior-height-mm 8 -o trimline.step
 
 # inspect a scan, its landmarks, and the generated curve
 fitting-cad view examples/synthetic_limb.stl \

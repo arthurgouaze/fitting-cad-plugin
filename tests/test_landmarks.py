@@ -10,12 +10,10 @@ and is exercised manually, not here.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pytest
 
-from fitting_cad import io
+from _synthetic import normalized_mesh
 from fitting_cad.landmarks import (
     PICK_ORDER,
     REQUIRED_LANDMARKS,
@@ -26,13 +24,6 @@ from fitting_cad.landmarks import (
     save_landmarks_json,
     snap_to_surface,
 )
-
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
-SYNTHETIC = EXAMPLES / "synthetic_limb.stl"
-
-
-def _normalized_mesh():
-    return io.normalize_orientation(io.load_mesh(SYNTHETIC))
 
 
 def test_from_dict_coerces_points():
@@ -68,7 +59,7 @@ def test_missing_empty_when_all_required_present():
 
 
 def test_snap_to_surface_returns_a_mesh_vertex():
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     vertices = np.asarray(mesh.vertices)
     # A point offset from a known vertex should snap back onto a real vertex.
     target = vertices[100]
@@ -79,7 +70,7 @@ def test_snap_to_surface_returns_a_mesh_vertex():
 
 
 def test_snap_to_surface_picks_nearest():
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     vertices = np.asarray(mesh.vertices)
     target = vertices[250]
     snapped = snap_to_surface(mesh, target)
@@ -87,7 +78,7 @@ def test_snap_to_surface_picks_nearest():
 
 
 def test_snap_rejects_bad_point():
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     with pytest.raises(ValueError, match="3D point"):
         snap_to_surface(mesh, [1.0, 2.0])
 
@@ -96,7 +87,7 @@ def test_snap_rejects_bad_point():
 
 
 def test_save_load_landmarks_json_round_trip(tmp_path):
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     vertices = np.asarray(mesh.vertices)
     original = LandmarkSet.from_dict(
         {lm: vertices[i * 37] for i, lm in enumerate(REQUIRED_LANDMARKS)}
@@ -135,7 +126,7 @@ def _pick_near(mesh, index: int) -> np.ndarray:
 
 
 def test_pick_session_walks_the_order_and_snaps():
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     vertices = np.asarray(mesh.vertices)
     session = _PickSession(mesh)
 
@@ -150,7 +141,7 @@ def test_pick_session_walks_the_order_and_snaps():
 
 
 def test_pick_session_completes_and_reports_result():
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     session = _PickSession(mesh)
     for i, _ in enumerate(PICK_ORDER):
         session.record(_pick_near(mesh, 50 + 20 * i))
@@ -164,7 +155,7 @@ def test_pick_session_completes_and_reports_result():
 
 
 def test_pick_session_undo_allows_repick():
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     session = _PickSession(mesh)
     session.record(_pick_near(mesh, 10))
     _, second = session.record(_pick_near(mesh, 20))
@@ -181,13 +172,13 @@ def test_pick_session_undo_allows_repick():
 
 
 def test_pick_session_undo_at_start_is_a_no_op():
-    session = _PickSession(_normalized_mesh())
+    session = _PickSession(normalized_mesh())
     assert session.undo() is None
     assert session.index == 0
 
 
 def test_pick_session_record_after_completion_raises():
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     session = _PickSession(mesh)
     for i, _ in enumerate(PICK_ORDER):
         session.record(_pick_near(mesh, 5 * i + 1))
@@ -196,7 +187,7 @@ def test_pick_session_record_after_completion_raises():
 
 
 def test_pick_session_skips_optional_but_not_required():
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     # PATELLA is optional, PATELLAR_TENDON is required.
     session = _PickSession(mesh, order=(Landmark.PATELLA, *REQUIRED_LANDMARKS))
 
@@ -209,7 +200,7 @@ def test_pick_session_skips_optional_but_not_required():
 
 
 def test_pick_session_missing_tracks_required_only():
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     session = _PickSession(mesh)
     assert session.missing() == list(REQUIRED_LANDMARKS)
     # PICK_ORDER starts with the optional PATELLA; placing it leaves all
@@ -220,11 +211,11 @@ def test_pick_session_missing_tracks_required_only():
 
 def test_pick_session_rejects_order_missing_required():
     with pytest.raises(ValueError, match="omits required landmarks"):
-        _PickSession(_normalized_mesh(), order=(Landmark.PATELLA,))
+        _PickSession(normalized_mesh(), order=(Landmark.PATELLA,))
 
 
 def test_pick_session_prompt_names_the_current_landmark():
-    mesh = _normalized_mesh()
+    mesh = normalized_mesh()
     session = _PickSession(mesh)
 
     prompt = session.prompt()

@@ -17,8 +17,11 @@ dependencies = [
     "scipy>=1.11",
     # rtree provides the spatial index trimesh uses for ray-mesh intersection,
     # which the trim-line rule engine relies on to project the curve onto the
-    # surface. Pure-Python wheel bundling libspatialindex; headless, no GL.
+    # surface. The wheel bundles libspatialindex; headless, no GL.
     "rtree>=1.0",
+    # trimesh.repair.fix_winding walks the face-adjacency graph with networkx;
+    # mesh cleanup uses it to make scan winding consistent before hole filling.
+    "networkx>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -27,7 +30,10 @@ dependencies = [
 # headless/CI runs. The core trim-line pipeline (io / landmarks math / trimline /
 # cli with --landmarks) runs without it.
 viz = ["pyvista>=0.43"]
-dev = ["pytest>=8.0", "ruff>=0.5"]
+# Quadric decimation for clean_mesh(max_faces=...) and fit --max-faces. Optional
+# because only dense scans on small boards need it.
+decimate = ["fast-simplification>=0.1"]
+dev = ["pytest>=8.0", "ruff>=0.5", "fast-simplification>=0.1"]
 
 [project.scripts]
 fitting-cad = "fitting_cad.cli:main"

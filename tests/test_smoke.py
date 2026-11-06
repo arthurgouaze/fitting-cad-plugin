@@ -1,7 +1,4 @@
-"""Smoke tests — confirm the package imports and the CLI parser is wired.
-
-Real pipeline tests (Week 7) will run against synthetic meshes in examples/.
-"""
+"""Smoke tests: the package imports and the CLI parser is wired."""
 
 import fitting_cad
 from fitting_cad.cli import build_parser

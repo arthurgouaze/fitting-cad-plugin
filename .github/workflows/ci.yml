@@ -14,18 +14,18 @@ jobs:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
       # On ubuntu the manylinux wheels (numpy, trimesh, rtree, ...) and ruff run
-      # directly -- no NixOS LD_LIBRARY_PATH / loader shims. We install the dev
-      # extra only (pytest + ruff); the viz extra (pyvista, heavy GL/VTK, needs a
-      # working OpenGL driver) is deliberately skipped to keep CI light and
-      # headless -- the viewer tests skip themselves when pyvista is absent.
+      # directly, with no NixOS loader shims. Only the dev extra is installed
+      # (pytest, ruff, fast-simplification). The viz extra (pyvista, GL/VTK)
+      # stays out to keep CI light and headless; the viewer tests skip
+      # themselves when pyvista is absent.
       - name: Install package (dev extra)
         run: |
           python -m pip install --upgrade pip

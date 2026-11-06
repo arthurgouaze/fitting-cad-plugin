@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI-Assisted Fitting CAD Plugin — automated trim lines for transtibial sockets</title>
+<title>AI-Assisted Fitting CAD Plugin: automated trim lines for transtibial sockets</title>
 <meta name="description" content="Open-source software that automates the trim line, the rim curve a prosthetist draws by hand on every transtibial socket. Apache-2.0.">
 <meta name="color-scheme" content="dark">
 <meta property="og:title" content="AI-Assisted Fitting CAD Plugin">
@@ -211,6 +211,73 @@
     padding-top: 0.3rem;
   }
 
+  /* --- Pilot form --- */
+
+  .pilot {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem 1.1rem;
+    padding: 1.3rem;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    background: var(--bg-sunken);
+  }
+
+  .pilot .pilot-lead,
+  .pilot .pilot-wide,
+  .pilot .pilot-submit,
+  .pilot .pilot-status { grid-column: 1 / -1; }
+
+  .pilot .pilot-lead { color: var(--text-dim); font-size: 0.95rem; }
+
+  .pilot label { display: grid; gap: 0.35rem; }
+  .pilot .label-text {
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    font-weight: 550;
+    letter-spacing: 0.01em;
+  }
+
+  .pilot input,
+  .pilot select,
+  .pilot textarea {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--bg-raised);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.95rem;
+  }
+  .pilot textarea { resize: vertical; min-height: 5.5rem; }
+  .pilot input::placeholder, .pilot textarea::placeholder { color: var(--text-faint); }
+  .pilot input:focus-visible,
+  .pilot select:focus-visible,
+  .pilot textarea:focus-visible {
+    outline: 2px solid var(--info);
+    outline-offset: 1px;
+    border-color: var(--info);
+  }
+
+  .pilot .pilot-submit { justify-self: start; cursor: pointer; font: inherit; font-weight: 550; }
+
+  /* Honeypot: off-screen for people, visible to naive form bots. */
+  .pilot .pilot-honey {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  .pilot .pilot-status { color: var(--text-dim); font-size: 0.9rem; }
+  .pilot .pilot-status[data-state="error"] { color: var(--accent); }
+
+  @media (max-width: 40rem) {
+    .pilot { grid-template-columns: minmax(0, 1fr); padding: 1.1rem; }
+  }
+
   /* --- Footer --- */
 
   footer {
@@ -242,7 +309,7 @@
       <p class="eyebrow">Open-source socket fitting</p>
       <h1>AI-Assisted Fitting&nbsp;CAD Plugin</h1>
       <p class="lede">
-        Software that automates the trim line — the rim curve a prosthetist draws by
+        Software that automates the trim line, the rim curve a prosthetist draws by
         hand on every transtibial socket.
       </p>
       <p class="sub">
@@ -258,7 +325,7 @@
         <img class="shot" src="assets/hero.png" width="1600" height="1000"
              alt="A 3D limb model with seven labelled anatomical landmarks and a generated trim curve drawn in red around the socket rim.">
         <figcaption>
-          Automated trim line on a synthetic demo limb — not a patient scan. The blue
+          Automated trim line on a synthetic demo limb, not a patient scan. The blue
           markers are the placed landmarks; the red loop is the curve the rule engine
           generated from them.
         </figcaption>
@@ -282,7 +349,7 @@
         <li>
           <h3>Mark the landmarks</h3>
           <p>
-            Click about seven anatomical points — patellar tendon, tibial tubercle,
+            Click about seven anatomical points: patellar tendon, tibial tubercle,
             fibular head, the condyles, the popliteal. Each click snaps onto the surface,
             and the set is saved next to the scan so a case can be reopened exactly as
             you left it.
@@ -317,7 +384,7 @@
         <p>
           The fitting core is released under the <strong>Apache&nbsp;2.0</strong> licence.
           There is nothing to buy to try it, and nothing stopping a clinic, a fabricator
-          or a researcher from using and adapting it — including commercially.
+          or a researcher from using and adapting it, including commercially.
         </p>
         <p>
           It is built to <strong>fit an existing workflow, not replace one</strong>. Standard
@@ -358,7 +425,7 @@
       <div class="callout">
         <strong>I am looking for prosthetists to review generated curves.</strong>
         The most useful thing anyone can tell me right now is where a proposed trim line
-        is wrong and why — too high posteriorly, not enough relief anteriorly, wrong
+        is wrong and why: too high posteriorly, not enough relief anteriorly, wrong
         through the walls. Your judgment calibrates the defaults. A short conversation
         over a few example curves is enough to move this forward.
       </div>
@@ -381,6 +448,45 @@
           the trim line and what would have to be true for software to be worth your time.
           I am equally glad to hear that this is the wrong problem to solve.
         </p>
+        <!-- Submission needs no backend: while data-endpoint is empty the script at the
+             end of this page opens a prefilled mailto. Pasting a hosted form endpoint
+             (Formspree or similar) into data-endpoint switches it to a JSON fetch POST. -->
+        <form id="pilot" class="pilot" data-endpoint="" novalidate>
+          <p class="pilot-lead">
+            Interested in piloting the tool on your own scans? Leave a few details.
+          </p>
+          <label>
+            <span class="label-text">Name</span>
+            <input type="text" name="name" autocomplete="name" required>
+          </label>
+          <label>
+            <span class="label-text">Clinic or practice</span>
+            <input type="text" name="clinic" autocomplete="organization">
+          </label>
+          <label>
+            <span class="label-text">Role</span>
+            <select name="role">
+              <option value="prosthetist">Prosthetist</option>
+              <option value="fabricator">Fabricator</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            <span class="label-text">Scan setup</span>
+            <input type="text" name="scan_setup" placeholder="scanner + CAD tool">
+          </label>
+          <label class="pilot-wide">
+            <span class="label-text">Anything else</span>
+            <textarea name="message" rows="4"
+              placeholder="How the trim line gets drawn today, or what would make this worth a try."></textarea>
+          </label>
+          <label class="pilot-honey" aria-hidden="true">
+            <span class="label-text">Leave this field empty</span>
+            <input type="text" name="_gotcha" tabindex="-1" autocomplete="off">
+          </label>
+          <button type="submit" class="btn btn--primary pilot-submit">Send pilot interest</button>
+          <p class="pilot-status" aria-live="polite" hidden></p>
+        </form>
         <div class="contact-links">
           <a href="mailto:arthurgouaze@gmail.com">arthurgouaze@gmail.com</a>
           <a href="https://github.com/arthurgouaze/fitting-cad-plugin">github.com/arthurgouaze/fitting-cad-plugin</a>
@@ -393,13 +499,81 @@
 
 <footer>
   <div class="wrap">
-    <span>AI-Assisted Fitting CAD Plugin — part of the iStem venture program</span>
+    <span>AI-Assisted Fitting CAD Plugin, part of the iStem venture program</span>
     <span>
       <a href="https://github.com/arthurgouaze/fitting-cad-plugin">Source on GitHub</a>
       · <a href="https://github.com/arthurgouaze/fitting-cad-plugin/blob/main/LICENSE">Apache-2.0</a>
     </span>
   </div>
 </footer>
+
+<script>
+(function () {
+  var form = document.getElementById("pilot");
+  if (!form) { return; }
+
+  var status = form.querySelector(".pilot-status");
+  var FIELDS = ["name", "clinic", "role", "scan_setup", "message"];
+  var MAILTO = "mailto:arthurgouaze@gmail.com?subject=Pilot%20interest&body=";
+
+  function say(text, state) {
+    if (!status) { return; }
+    status.textContent = text;
+    status.setAttribute("data-state", state);
+    status.hidden = false;
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    var data = new FormData(form);
+
+    // Honeypot: nobody sees this field, so anything in it came from a bot.
+    if (String(data.get("_gotcha") || "").trim() !== "") { return; }
+
+    var values = {};
+    FIELDS.forEach(function (key) {
+      values[key] = String(data.get(key) || "").trim();
+    });
+
+    if (values.name === "") {
+      say("A name is needed so the reply has somewhere to go.", "error");
+      return;
+    }
+
+    var endpoint = (form.dataset.endpoint || "").trim();
+
+    if (endpoint !== "") {
+      say("Sending...", "pending");
+      fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(values)
+      }).then(function (response) {
+        if (!response.ok) { throw new Error("HTTP " + response.status); }
+        form.reset();
+        say("Thanks. A reply will follow by email.", "ok");
+      }).catch(function () {
+        say("That did not send. Email arthurgouaze@gmail.com directly instead.", "error");
+      });
+      return;
+    }
+
+    // No endpoint configured yet: hand the details to the visitor's mail client.
+    var body = [
+      "Name: " + values.name,
+      "Clinic: " + values.clinic,
+      "Role: " + values.role,
+      "Scan setup: " + values.scan_setup,
+      "",
+      values.message
+    ].join("\n");
+
+    say("Opening an email with these details.", "ok");
+    window.location.href = MAILTO + encodeURIComponent(body);
+  });
+})();
+</script>
 
 </body>
 </html>
