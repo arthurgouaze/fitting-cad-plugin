@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-from fitting_cad import step_writer
+from limbform import step_writer
 
 # Suffixes trimesh can round-trip as a single surface mesh for this pipeline.
 _SUPPORTED_MESH_SUFFIXES = {".stl", ".ply", ".obj"}
@@ -347,7 +347,7 @@ def export_curve(curve: np.ndarray, path: str | Path) -> Path:
     """Export the ordered closed trim curve as CAD/CAM-ready STEP.
 
     The loop is written as a single POLYLINE inside a millimetre AP214
-    wireframe shape (see fitting_cad.step_writer). trimesh has no STEP
+    wireframe shape (see limbform.step_writer). trimesh has no STEP
     writer and a full OCCT bridge (cascadio/OCP/build123d) is far too heavy just
     to serialize a curve, so this uses a small dependency-free text writer.
 

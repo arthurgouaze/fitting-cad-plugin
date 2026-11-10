@@ -2,17 +2,17 @@
 
 Renders the limb mesh, the placed landmarks, and the generated trim curve in one
 scene, and provides the drawing primitives the interactive landmark picker
-(fitting_cad.landmarks.place_landmarks) builds its session on.
+(limbform.landmarks.place_landmarks) builds its session on.
 
 pyvista is an optional dependency (the viz extra): the headless pipeline
-(fitting-cad fit --landmarks ...) never imports it. Every entry point here
+(limbform fit --landmarks ...) never imports it. Every entry point here
 therefore imports it lazily via require_pyvista, which raises an
 actionable ImportError when the extra is missing.
 
 Coordinate frame: everything is drawn in whatever frame the caller passes. In
 practice that is the canonical limb frame (long axis +Z, proximal rim at
 Z = 0, anterior +X) produced by
-fitting_cad.io.normalize_orientation, so the default camera looks at the
+limbform.io.normalize_orientation, so the default camera looks at the
 limb from the anterolateral side with +Z up.
 """
 
@@ -26,7 +26,7 @@ import numpy as np
 if TYPE_CHECKING:
     import trimesh
 
-    from fitting_cad.landmarks import LandmarkSet
+    from limbform.landmarks import LandmarkSet
 
 # --- Scene palette ---------------------------------------------------------
 # Green limb, blue landmarks, red trim line, on a dark background.
@@ -44,7 +44,7 @@ TRIMLINE_RADIUS_FRAC = 0.006
 _VIZ_HINT = (
     "The 3D viewer and the interactive landmark picker need the optional 'viz' "
     "extra. Install it with:  pip install -e '.[dev,viz]'  . The headless "
-    "pipeline (fitting-cad fit --landmarks PATH) runs without it."
+    "pipeline (limbform fit --landmarks PATH) runs without it."
 )
 
 
@@ -202,7 +202,7 @@ def add_trimline(plotter: Any, curve: np.ndarray, radius: float, name: str = "tr
     Args:
         plotter: A pyvista.Plotter.
         curve: An (N, 3) ordered loop of points (as returned by
-            fitting_cad.trimline.generate_trimline).
+            limbform.trimline.generate_trimline).
         radius: Tube radius in model units.
         name: Actor name.
 
@@ -249,7 +249,7 @@ def show(
     off_screen: bool = False,
     screenshot: str | Path | None = None,
     window_size: tuple[int, int] = (1100, 800),
-    title: str = "fitting-cad",
+    title: str = "limbform",
 ) -> None:
     """Show the limb mesh with optional landmark and trim-curve overlays.
 
@@ -258,7 +258,7 @@ def show(
     a camera framed on the limb with +Z up.
 
     Pass the normalized mesh (see
-    fitting_cad.io.normalize_orientation) together with landmarks and a
+    limbform.io.normalize_orientation) together with landmarks and a
     curve from the same frame; this function does no frame conversion.
 
     Args:

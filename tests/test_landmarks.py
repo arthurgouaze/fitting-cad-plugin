@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from _synthetic import normalized_mesh
-from fitting_cad.landmarks import (
+from limbform.landmarks import (
     PICK_ORDER,
     REQUIRED_LANDMARKS,
     Landmark,

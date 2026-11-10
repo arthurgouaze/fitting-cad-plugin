@@ -6,7 +6,7 @@ Generate the socket trim line (rim curve) from anatomical landmarks using
 clinical convention, rather than learned/ML methods. The curve is what a
 prosthetist would otherwise draw by hand on every socket.
 
-Canonical frame (set by fitting_cad.io.normalize_orientation):
+Canonical frame (set by limbform.io.normalize_orientation):
 
 - limb long axis -> +Z, proximal rim at Z = 0 (wide end),
 - limb tapers toward +Z, origin at the proximal-rim centroid.
@@ -29,7 +29,7 @@ import numpy as np
 import trimesh
 
 if TYPE_CHECKING:
-    from fitting_cad.landmarks import LandmarkSet
+    from limbform.landmarks import LandmarkSet
 
 
 @dataclass

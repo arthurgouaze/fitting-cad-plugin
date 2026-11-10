@@ -6,7 +6,7 @@ and involves no patient data, but has the properties the pipeline needs:
 
 - a clear long axis (so PCA orientation has something to lock onto),
 - a wide proximal end and a narrower, rounded distal end (so the
-  proximal/distal sign convention in fitting_cad.io.normalize_orientation
+  proximal/distal sign convention in limbform.io.normalize_orientation
   can be exercised),
 - a slight elliptical cross-section (anterior-posterior vs medial-lateral),
 - a watertight surface (closed rim cap + rounded distal pole).

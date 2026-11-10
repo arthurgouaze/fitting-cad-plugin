@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-from fitting_cad import io
-from fitting_cad.landmarks import Landmark, LandmarkSet, snap_to_surface
+from limbform import io
+from limbform.landmarks import Landmark, LandmarkSet, snap_to_surface
 
 SYNTHETIC = Path(__file__).resolve().parent.parent / "examples" / "synthetic_limb.stl"
 

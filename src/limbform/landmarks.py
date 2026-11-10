@@ -3,7 +3,7 @@
 Roadmap: Week 5 (landmark-placement step).
 
 The clinician places ~6-8 anatomical landmarks on the normalized limb mesh.
-These drive the rule-based trim-curve generation in fitting_cad.trimline.
+These drive the rule-based trim-curve generation in limbform.trimline.
 
 This module keeps the non-interactive parts (the LandmarkSet
 container, a nearest-vertex snap helper, the sidecar reader/writer, and the
@@ -145,7 +145,7 @@ def load_landmarks_json(path: str | Path, mesh: trimesh.Trimesh | None = None) -
         }
 
     Coordinates are read in the canonical limb frame returned by
-    fitting_cad.io.normalize_orientation (long axis +Z, proximal rim at Z = 0,
+    limbform.io.normalize_orientation (long axis +Z, proximal rim at Z = 0,
     origin at the proximal-rim centroid), not raw scanner coordinates. The
     pipeline normalizes the mesh before generating the trim line, so a sidecar
     in scanner coordinates would not line up with the surface.
@@ -379,7 +379,7 @@ def place_landmarks(
       automatically once the whole pick order is exhausted.
 
     Run this on the NORMALIZED mesh (the output of
-    fitting_cad.io.normalize_orientation), never on the raw scan. The
+    limbform.io.normalize_orientation), never on the raw scan. The
     returned points, and the sidecar written when save_path is given, are
     therefore in the canonical limb frame, which is the frame
     load_landmarks_json and the trim-line rule engine expect. Picking on
@@ -402,14 +402,14 @@ def place_landmarks(
         ImportError: pyvista is not installed (see the viz extra).
         ValueError: The session was finished with required landmarks unplaced.
     """
-    from fitting_cad import viewer
+    from limbform import viewer
 
     pv = viewer.require_pyvista()
 
     session = _PickSession(mesh, order=order)
     radius = viewer.LANDMARK_RADIUS_FRAC * viewer.scene_scale(mesh)
 
-    plotter = pv.Plotter(window_size=(1100, 800), title="fitting-cad - place landmarks")
+    plotter = pv.Plotter(window_size=(1100, 800), title="limbform - place landmarks")
     plotter.set_background(viewer.BACKGROUND_COLOR)
     viewer.add_limb_surface(plotter, mesh)
     plotter.add_axes()

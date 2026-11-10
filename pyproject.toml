@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fitting-cad"
+name = "limbform"
 version = "0.0.1"
 description = "Open-core CAD layer automating transtibial prosthetic socket trim-line generation"
 readme = "README.md"
@@ -36,13 +36,13 @@ decimate = ["fast-simplification>=0.1"]
 dev = ["pytest>=8.0", "ruff>=0.5", "fast-simplification>=0.1"]
 
 [project.scripts]
-fitting-cad = "fitting_cad.cli:main"
+limbform = "limbform.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/arthurgouaze/fitting-cad-plugin"
+Homepage = "https://github.com/arthurgouaze/limbform"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/fitting_cad"]
+packages = ["src/limbform"]
 
 [tool.ruff]
 line-length = 100

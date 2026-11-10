@@ -19,11 +19,11 @@ import numpy as np
 import pytest
 
 from _synthetic import normalized_mesh, synthetic_landmarks
-from fitting_cad.trimline import generate_trimline
+from limbform.trimline import generate_trimline
 
 pytest.importorskip("pyvista")
 
-from fitting_cad import viewer
+from limbform import viewer
 
 _GL_PROBE = (
     "import pyvista as pv;"

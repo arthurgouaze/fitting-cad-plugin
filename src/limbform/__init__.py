@@ -1,4 +1,4 @@
-"""fitting_cad: open-core CAD automation for prosthetic socket fitting.
+"""limbform: open-core CAD automation for prosthetic socket fitting.
 
 Pipeline (rule-based trim-line generation for transtibial sockets):
 

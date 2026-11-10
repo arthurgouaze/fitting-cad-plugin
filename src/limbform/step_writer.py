@@ -163,7 +163,7 @@ def _build_step_text(pts: np.ndarray, *, name: str) -> str:
         "HEADER;\n"
         "FILE_DESCRIPTION(('transtibial socket trim line'),'2;1');\n"
         f"FILE_NAME('{name}.step','{timestamp}',(''),(''),"
-        "'fitting-cad','fitting-cad','');\n"
+        "'limbform','limbform','');\n"
         "FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));\n"
         "ENDSEC;\n"
     )

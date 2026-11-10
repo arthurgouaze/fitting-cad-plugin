@@ -19,10 +19,10 @@ import numpy as np
 import pytest
 
 from _synthetic import SYNTHETIC, normalized_mesh, synthetic_landmarks
-from fitting_cad import cli, io
-from fitting_cad.cli import main
-from fitting_cad.landmarks import save_landmarks_json
-from fitting_cad.trimline import TrimRules
+from limbform import cli, io
+from limbform.cli import main
+from limbform.landmarks import save_landmarks_json
+from limbform.trimline import TrimRules
 
 
 def _write_landmark_sidecar(path: Path) -> Path:

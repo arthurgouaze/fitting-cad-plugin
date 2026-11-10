@@ -24,9 +24,9 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-from fitting_cad import io, viewer
-from fitting_cad.landmarks import load_landmarks_json, place_landmarks
-from fitting_cad.trimline import TrimRules, generate_trimline, validate_trimline
+from limbform import io, viewer
+from limbform.landmarks import load_landmarks_json, place_landmarks
+from limbform.trimline import TrimRules, generate_trimline, validate_trimline
 
 # Curve output formats. Ordered-point formats are written here; .step/.stp route
 # to io.export_curve, which writes a CAD/CAM-ready STEP polyline.
@@ -41,7 +41,7 @@ _RULE_FIELDS = [
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="fitting-cad",
+        prog="limbform",
         description="Automated transtibial socket trim-line generation.",
     )
     sub = parser.add_subparsers(dest="command", required=True)

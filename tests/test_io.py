@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 import trimesh
 
-from fitting_cad import io
+from limbform import io
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 SYNTHETIC = EXAMPLES / "synthetic_limb.stl"
@@ -258,6 +258,7 @@ def test_export_curve_writes_valid_step(tmp_path, suffix):
     assert text.startswith("ISO-10303-21;")
     assert text.rstrip().endswith("END-ISO-10303-21;")
     assert "FILE_SCHEMA(('AUTOMOTIVE_DESIGN" in text
+    assert "'limbform','limbform','');" in text  # preprocessor + originating system
     assert "SI_UNIT(.MILLI.,.METRE.)" in text  # millimetre units
     assert "POLYLINE(" in text
 

@@ -13,8 +13,8 @@ import pytest
 import trimesh
 
 from _synthetic import normalized_mesh, synthetic_landmarks
-from fitting_cad.landmarks import LandmarkSet
-from fitting_cad.trimline import TrimRules, generate_trimline, validate_trimline
+from limbform.landmarks import LandmarkSet
+from limbform.trimline import TrimRules, generate_trimline, validate_trimline
 
 RESOLUTION = 180
 

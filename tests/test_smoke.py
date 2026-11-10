@@ -1,11 +1,11 @@
 """Smoke tests: the package imports and the CLI parser is wired."""
 
-import fitting_cad
-from fitting_cad.cli import build_parser
+import limbform
+from limbform.cli import build_parser
 
 
 def test_version():
-    assert fitting_cad.__version__
+    assert limbform.__version__
 
 
 def test_parser_builds():
