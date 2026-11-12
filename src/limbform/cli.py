@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """Command-line entry point.
 
 Roadmap: Week 8 (clinician wrapper).

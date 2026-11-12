@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """Synthetic-limb helpers shared by the test modules."""
 
 from __future__ import annotations

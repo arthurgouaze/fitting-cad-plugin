@@ -15,8 +15,10 @@ limb scan (STL/PLY/OBJ)
   → export CAD/CAM-ready geometry (STL for 3D print, STEP for CAD/CAM)
 ```
 
-The fitting-automation core is open-source (Apache-2.0) to drive adoption,
+The fitting-automation core is open-source (AGPL-3.0-only) to drive adoption,
 revenue is planned later from a proprietary managed tier.
+The licence applies to this repository, and contributions are accepted under
+the same terms.
 
 ## Status
 

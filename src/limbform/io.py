@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """Mesh I/O and orientation normalization.
 
 Roadmap: Week 5 (mesh pipeline) and Week 7 (export).

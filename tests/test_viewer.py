@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """Viewer tests, headless only.
 
 The viewer needs the optional viz extra plus a working off-screen GL stack,

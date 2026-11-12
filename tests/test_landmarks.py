@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """Tests for the non-interactive landmark plumbing.
 
 Covers the headless container, the surface-snap helper, the required-landmark

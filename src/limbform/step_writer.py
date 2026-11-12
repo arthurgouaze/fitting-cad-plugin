@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """Minimal, dependency-free STEP (ISO 10303-21) writer for a 3D trim curve.
 
 Roadmap: Week 7 (export). Emits the ordered closed trim loop as CAD/CAM-ready

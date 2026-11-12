@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """Anatomical landmark placement and the non-interactive plumbing around it.
 
 Roadmap: Week 5 (landmark-placement step).

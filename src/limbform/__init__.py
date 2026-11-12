@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """limbform: open-core CAD automation for prosthetic socket fitting.
 
 Pipeline (rule-based trim-line generation for transtibial sockets):

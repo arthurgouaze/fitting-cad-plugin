@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 # Run the ruff binary from .venv on NixOS.
 #
 # Why: ruff's wheel ships a single dynamically-linked native binary built for

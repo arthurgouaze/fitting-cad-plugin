@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """End-to-end CLI pipeline tests, run headless against the synthetic mesh.
 
 Exercises cli.main(["fit", ...]) over the full

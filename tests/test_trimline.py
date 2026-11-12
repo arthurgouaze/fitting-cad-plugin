@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """Tests for the trim-line rule engine against the synthetic mesh.
 
 Builds a LandmarkSet programmatically on the normalized synthetic mesh (no

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """I/O-layer tests against the synthetic limb mesh.
 
 These exercise load, clean, normalize, mesh round-trip and STEP curve export

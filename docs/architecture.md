@@ -39,7 +39,7 @@ decimates to a face budget.
 - **Synthetic / open meshes** during development so nothing waits on IRB.
 - **STEP without a kernel**: `step_writer.py` emits the trim loop as an AP214 millimetre
   polyline with no dependencies; the OCCT bridges were rejected as too heavy for one curve.
-- **Open core**: this pipeline is Apache-2.0; the managed tier is proprietary.
+- **Open core**: this pipeline is AGPL-3.0-only; the managed tier is proprietary.
 
 An architecture sketch exists alongside the planning notes (tracked separately).
 

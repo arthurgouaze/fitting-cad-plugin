@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """Reproducible generator for the synthetic transtibial limb mesh.
 
 Produces examples/synthetic_limb.stl: a closed, tapered, slightly elliptical

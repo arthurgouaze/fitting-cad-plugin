@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 """PyVista-based 3D viewer.
 
 Renders the limb mesh, the placed landmarks, and the generated trim curve in one

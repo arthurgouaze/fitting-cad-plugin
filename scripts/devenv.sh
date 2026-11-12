@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Arthur Gouaze
 # Resolve the native runtime libraries that manylinux wheels (numpy, trimesh,
 # rtree, and the optional pyvista/VTK) need at import time on NixOS (non-FHS).
 #

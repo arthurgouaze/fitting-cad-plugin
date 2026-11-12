@@ -8,9 +8,12 @@ version = "0.0.1"
 description = "Open-core CAD layer automating transtibial prosthetic socket trim-line generation"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = { text = "AGPL-3.0-only" }
 authors = [{ name = "Arthur Gouaze", email = "122196040+arthurgouaze@users.noreply.github.com" }]
 keywords = ["prosthetics", "cad", "mesh", "trim-line", "fitting"]
+classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+]
 dependencies = [
     "numpy>=1.26",
     "trimesh>=4.0",
